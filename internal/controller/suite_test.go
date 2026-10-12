@@ -75,7 +75,7 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			// Trainer and sshpiper CRDs exported from the dev cluster.
+			// Trainer CRDs exported from the dev cluster.
 			filepath.Join("testdata", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
@@ -113,6 +113,13 @@ var _ = BeforeSuite(func() {
 		Scheme:          mgr.GetScheme(),
 		ConfigNamespace: configNamespace,
 	}).SetupWithManager(mgr)).To(Succeed())
+	Expect((&PoolRequestReconciler{
+		Client:          mgr.GetClient(),
+		APIReader:       mgr.GetAPIReader(),
+		Scheme:          mgr.GetScheme(),
+		ConfigNamespace: configNamespace,
+	}).SetupWithManager(mgr)).To(Succeed())
+	Expect((&ImageWarmupReconciler{Client: mgr.GetClient()}).SetupWithManager(mgr)).To(Succeed())
 
 	go func() {
 		defer GinkgoRecover()

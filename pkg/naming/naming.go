@@ -1,6 +1,6 @@
 // Package naming holds object names and label keys shared by the operator,
-// the compat API and the GUI. Names follow scc-k8s-v2 so URLs, PVCs and SSH
-// usernames stay compatible.
+// the compat API and the GUI. Names follow scc-k8s-v2 so job IDs and PVCs
+// stay compatible.
 package naming
 
 import (
@@ -24,15 +24,42 @@ const (
 	LabelNodePool     = "scclabs.dev/pool"
 	LabelGPU          = "scclabs.dev/gpu"
 	LabelCompletion   = "batch.kubernetes.io/job-completion-index"
+	LabelVolumeID     = "pod.scclabs.dev/volume-id"
+	LabelJobName      = "job-name"
+
+	// Pool request labels (scc-k8s-v2 pool placeholders).
+	LabelPoolRequestID  = "pool.scclabs.dev/request-id"
+	LabelPoolRequestSrc = "pool.scclabs.dev/src-pool"
+	LabelPoolRequestDst = "pool.scclabs.dev/dst-pool"
 
 	// LabelTrainingJob is set on every object owned by a TrainingJob (value = CR name).
 	LabelTrainingJob = "forgeai.scclabs.dev/training-job"
 
+	// LabelComponent marks every object the operator manages (training,
+	// pool-placeholder, image-warmup); the operator caches only these.
+	LabelComponent = "forgeai.scclabs.dev/component"
+	// LabelImageWarmup is the warmup ID (hash of the image) on warmup DaemonSets.
+	LabelImageWarmup = "forgeai.scclabs.dev/image-warmup"
+	// AnnotationExpires is when a warmup DaemonSet is removed (RFC3339).
+	AnnotationExpires = "forgeai.scclabs.dev/expires"
+	// AnnotationImage is the image a warmup DaemonSet pulls.
+	AnnotationImage = "forgeai.scclabs.dev/image"
+
 	// AnnotationRestartGeneration records which restartGeneration created a TrainJob.
 	AnnotationRestartGeneration = "forgeai.scclabs.dev/restart-generation"
 
-	AppNameTrainingJob = "forgeai-training"
-	ManagedBy          = "forgeai"
+	AppNameTrainingJob     = "forgeai-training"
+	AppNameVolume          = "volume"
+	AppNamePoolPlaceholder = "pool-placeholder"
+	AppNameImageWarmup     = "forgeai-image-warmup"
+	ManagedBy              = "forgeai"
+
+	ComponentTraining        = "training"
+	ComponentPoolPlaceholder = "pool-placeholder"
+	ComponentImageWarmup     = "image-warmup"
+
+	// DefaultPool is the pool of nodes without a pool request.
+	DefaultPool = "default"
 )
 
 const (
@@ -81,13 +108,23 @@ func NetworkPolicyName(namespace, userID string) string {
 	return JobName(namespace, userID, "default")
 }
 
-func RuntimeName(job string) string              { return job + "-runtime" }
-func SecretName(job string) string               { return job + "-service-secret" }
-func HTTPServiceName(job string, i int32) string { return fmt.Sprintf("%s-svc-%d", job, i) }
-func IngressName(job string, i int32) string     { return fmt.Sprintf("%s-%d", job, i) }
-func SSHServiceName(job string, i int32) string  { return fmt.Sprintf("%s-sshpiper-end-%d", job, i) }
-func PipeName(job string, i int32) string        { return fmt.Sprintf("%s-pipe-pwd-%d", job, i) }
-func SSHUser(jobID string, i int32) string       { return fmt.Sprintf("root@%s-%d", jobID, i) }
-func IngressHost(job string, i int32, domain string) string {
-	return fmt.Sprintf("%s-%d.%s", job, i, domain)
+func RuntimeName(job string) string { return job + "-runtime" }
+
+// PoolRequestName is the PoolRequest (and placeholder Job) name: p-{userHash}-{requestID}.
+func PoolRequestName(namespace, userID, requestID string) string {
+	return JobName(namespace, userID, requestID)
+}
+
+// ImageWarmupName is the warmup DaemonSet name of an image.
+func ImageWarmupName(image string) string {
+	return "forgeai-warmup-" + ImageWarmupID(image)
+}
+
+// ImageWarmupID is a stable short hash of an image reference.
+func ImageWarmupID(image string) string {
+	h := fnv1a(image)
+	if len(h) < 16 {
+		h = strings.Repeat("0", 16-len(h)) + h
+	}
+	return h
 }

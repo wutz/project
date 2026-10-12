@@ -42,8 +42,9 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          TrainingJob is a distributed training job built on Kubeflow Trainer + Kueue,
-          with per-worker SSH and Jupyter access.
+          TrainingJob is a distributed training job built on Kubeflow Trainer + Kueue.
+          Workers are not reachable interactively: the pod network is not isolated
+          between users, so no SSH / Jupyter / exec endpoints are exposed.
         properties:
           apiVersion:
             description: |-
@@ -65,20 +66,6 @@ spec:
           spec:
             description: spec defines the desired state of TrainingJob
             properties:
-              access:
-                description: access controls SSH / Jupyter endpoints.
-                properties:
-                  jupyter:
-                    default: true
-                    description: jupyter creates a Service + Ingress per worker on
-                      port 1888.
-                    type: boolean
-                  ssh:
-                    default: true
-                    description: ssh creates a sshpiper Pipe per worker (username
-                      root@{jobID}-{index}).
-                    type: boolean
-                type: object
               command:
                 description: command is a bash script run in every worker. When empty
                   the image entrypoint is used.
@@ -125,7 +112,7 @@ spec:
               suspend:
                 description: |-
                   suspend stops the job: the underlying TrainJob and its pods are deleted,
-                  access endpoints are removed, the spec is kept so it can be started again.
+                  the spec is kept so it can be started again.
                 type: boolean
               userGroup:
                 description: userGroup is propagated as the user.scclabs.dev/group
@@ -290,11 +277,6 @@ spec:
                     index:
                       format: int32
                       type: integer
-                    jupyterURLs:
-                      description: jupyterURLs are the ingress URLs for this worker.
-                      items:
-                        type: string
-                      type: array
                     nodeIP:
                       type: string
                     nodeName:
@@ -305,9 +287,6 @@ spec:
                     podIP:
                       type: string
                     podName:
-                      type: string
-                    sshUser:
-                      description: sshUser is the sshpiper username for this worker.
                       type: string
                   required:
                   - index

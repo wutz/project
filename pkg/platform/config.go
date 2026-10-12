@@ -1,12 +1,11 @@
-// Package platform loads the forgeai platform config (resource models, domains,
-// access settings) shared by the operator, compat API and GUI.
+// Package platform loads the forgeai platform config (resource models, storage,
+// registry and scheduling settings) shared by the operator, compat API and GUI.
 package platform
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,6 +36,9 @@ type Resource struct {
 		SizeGB float64 `json:"sizeGB"`
 	} `json:"memory"`
 	Labels map[string]string `json:"labels,omitempty"`
+	// UsageFrom reports availability of another model. scc-k8s-v2 hard-coded
+	// this for xeon6530.xlarge.4c16g, which shares GPU nodes with the 8x model.
+	UsageFrom string `json:"usageFrom,omitempty"`
 }
 
 // GPUCount returns the GPU count, 0 for CPU-only models.
@@ -60,27 +62,13 @@ type NetworkRef struct {
 	Namespace string `json:"namespace"`
 }
 
-type SSHConfig struct {
-	// PiperService is namespace/name of the sshpiper LoadBalancer service.
-	PiperService string `json:"piperService"`
-	// Domains maps LB IP to user-facing domains.
-	Domains map[string][]string `json:"domains,omitempty"`
-}
-
 type Config struct {
 	ReleaseVersion string `json:"releaseVersion"`
-	// RootDomain and ExtraDomains are used for per-worker Jupyter ingress hosts.
-	RootDomain   string    `json:"rootDomain"`
-	ExtraDomains []string  `json:"extraDomains,omitempty"`
-	IngressClass string    `json:"ingressClass,omitempty"`
-	SSH          SSHConfig `json:"ssh"`
 
 	// DefaultQueue is the Kueue LocalQueue used when a job sets none.
-	DefaultQueue   string `json:"defaultQueue"`
-	ServiceAccount string `json:"serviceAccount,omitempty"`
-	// BaseToolsHostPath is mounted read-only at /base (ssh/jupyter entrypoint).
-	BaseToolsHostPath string `json:"baseToolsHostPath,omitempty"`
-	EphemeralStorage  string `json:"ephemeralStorage,omitempty"`
+	DefaultQueue     string `json:"defaultQueue"`
+	ServiceAccount   string `json:"serviceAccount,omitempty"`
+	EphemeralStorage string `json:"ephemeralStorage,omitempty"`
 	// ExtraResources are added to every worker (e.g. nextflow.io/fuse: 1).
 	ExtraResources map[string]string `json:"extraResources,omitempty"`
 
@@ -101,7 +89,54 @@ type Config struct {
 	// UserNetworkPolicy creates the scc-k8s-v2 style per-user egress policy.
 	UserNetworkPolicy bool `json:"userNetworkPolicy"`
 
+	// StorageTypes maps a volume type (e.g. high-perf) to its StorageClass.
+	StorageTypes map[string]StorageType `json:"storageTypes,omitempty"`
+	// Registry is the Harbor registry holding user images.
+	Registry Registry `json:"registry,omitempty"`
+	// VolumeUsage is the scc-monitor-querier endpoint reporting PVC usage.
+	VolumeUsage VolumeUsage `json:"volumeUsage,omitempty"`
+	// ImageWarmup controls node image pre-pulls.
+	ImageWarmup ImageWarmup `json:"imageWarmup,omitempty"`
+	// PoolPlaceholderImage is the image of the pods holding nodes during a
+	// pool transfer; it only sleeps.
+	PoolPlaceholderImage string `json:"poolPlaceholderImage,omitempty"`
+
 	Resources []Resource `json:"resources"`
+}
+
+type StorageType struct {
+	StorageClass      string `json:"storageClass"`
+	DefaultAccessMode string `json:"defaultAccessMode,omitempty"`
+}
+
+type Registry struct {
+	// Domain is host[:port] of the Harbor registry.
+	Domain string `json:"domain,omitempty"`
+	// Insecure skips TLS verification (scc-k8s-v2 used verify=False).
+	Insecure bool `json:"insecure,omitempty"`
+}
+
+type VolumeUsage struct {
+	// BaseURL of scc-monitor-querier, e.g. http://scc-m-q-agent.mon.svc:8003.
+	BaseURL string `json:"baseURL,omitempty"`
+}
+
+type ImageWarmup struct {
+	// NodeSelector picks the nodes that pre-pull images.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// TTL after which a warmup is removed even if some nodes did not pull.
+	TTL string `json:"ttl,omitempty"`
+}
+
+// StorageType looks up a volume type.
+func (c *Config) StorageType(name string) (StorageType, error) {
+	if t, ok := c.StorageTypes[name]; ok && t.StorageClass != "" {
+		if t.DefaultAccessMode == "" {
+			t.DefaultAccessMode = "ReadWriteMany"
+		}
+		return t, nil
+	}
+	return StorageType{}, fmt.Errorf("volume type %q is not supported", name)
 }
 
 // Resource looks up a resource model.
@@ -112,17 +147,6 @@ func (c *Config) Resource(id string) (Resource, error) {
 		}
 	}
 	return Resource{}, fmt.Errorf("resource %q not found", id)
-}
-
-// Domains returns the root domain followed by extra domains.
-func (c *Config) Domains() []string {
-	out := []string{}
-	for _, d := range append([]string{c.RootDomain}, c.ExtraDomains...) {
-		if d = strings.TrimSpace(d); d != "" {
-			out = append(out, d)
-		}
-	}
-	return out
 }
 
 // Parse parses YAML and applies defaults.
@@ -142,6 +166,12 @@ func Parse(data []byte) (*Config, error) {
 	}
 	if c.ReleaseVersion == "" {
 		c.ReleaseVersion = "dev"
+	}
+	if c.ImageWarmup.TTL == "" {
+		c.ImageWarmup.TTL = "2h"
+	}
+	if c.PoolPlaceholderImage == "" {
+		c.PoolPlaceholderImage = "registry.k8s.io/pause:3.10"
 	}
 	return c, nil
 }

@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the forgeai itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- poolrequest_admin_role.yaml
+- poolrequest_editor_role.yaml
+- poolrequest_viewer_role.yaml
 - trainingjob_admin_role.yaml
 - trainingjob_editor_role.yaml
 - trainingjob_viewer_role.yaml
