@@ -1,0 +1,14 @@
+defaultBaseImage: gcr.io/distroless/static:nonroot
+defaultPlatforms:
+- linux/amd64
+builds:
+- id: manager
+  dir: .
+  main: ./cmd
+  ldflags:
+  - -s -w
+- id: compat-api
+  dir: ./compat-api
+  main: ./cmd/compat-api
+  ldflags:
+  - -s -w
