@@ -18,11 +18,19 @@ resources:
 - metrics_auth_role.yaml
 - metrics_auth_role_binding.yaml
 - metrics_reader_role.yaml
+# Roles bound to Project members by the operator.
+- project_roles.yaml
 # For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
 # default, aiding admins in cluster management. Those roles are
 # not used by the forgeai itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- trainingjob_admin_role.yaml
-- trainingjob_editor_role.yaml
-- trainingjob_viewer_role.yaml
+- fileserver_admin_role.yaml
+- fileserver_editor_role.yaml
+- fileserver_viewer_role.yaml
+- instancetype_admin_role.yaml
+- instancetype_editor_role.yaml
+- instancetype_viewer_role.yaml
+- project_admin_role.yaml
+- project_editor_role.yaml
+- project_viewer_role.yaml
 

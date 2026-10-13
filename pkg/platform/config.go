@@ -1,13 +1,18 @@
-// Package platform loads the forgeai platform config (resource models, storage,
-// registry and scheduling settings) shared by the operator, compat API and GUI.
+// Package platform loads the forgeai platform config shared by the operator
+// and the GUI: namespace prefix, storage types, registry, instance type
+// sizing, default quotas and service settings.
 package platform
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -21,129 +26,177 @@ const (
 	DefaultNamespace = "forgeai-system"
 )
 
-// Resource is a resource model (same shape as scc-k8s-v2 settings.resources).
-type Resource struct {
-	ID  string `json:"id"`
-	GPU *struct {
-		Count int    `json:"count"`
-		Model string `json:"model,omitempty"`
-	} `json:"gpu,omitempty"`
-	CPU struct {
-		Cores float64 `json:"cores"`
-		Model string  `json:"model,omitempty"`
-	} `json:"cpu"`
-	Memory struct {
-		SizeGB float64 `json:"sizeGB"`
-	} `json:"memory"`
-	Labels map[string]string `json:"labels,omitempty"`
-	// UsageFrom reports availability of another model. scc-k8s-v2 hard-coded
-	// this for xeon6530.xlarge.4c16g, which shares GPU nodes with the 8x model.
-	UsageFrom string `json:"usageFrom,omitempty"`
+// StorageType maps a volume type to a StorageClass.
+type StorageType struct {
+	StorageClass string `json:"storageClass"`
+	// AccessMode defaults to ReadWriteMany.
+	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+	// Description is shown in the GUI.
+	Description string `json:"description,omitempty"`
 }
 
-// GPUCount returns the GPU count, 0 for CPU-only models.
-func (r Resource) GPUCount() int {
-	if r.GPU == nil {
-		return 0
+// Ingress is how user-facing services are exposed.
+type Ingress struct {
+	ClassName string `json:"className,omitempty"`
+	// Domain is the wildcard DNS suffix, e.g. dev1.example.com.
+	Domain string `json:"domain,omitempty"`
+	// Port is the external HTTPS port (443 is omitted from URLs).
+	Port int `json:"port,omitempty"`
+	// TLSSecret is an optional certificate Secret in each project namespace;
+	// empty uses the ingress controller default certificate.
+	TLSSecret string `json:"tlsSecret,omitempty"`
+}
+
+// URL returns the external URL of host <sub>.<domain>.
+func (i Ingress) URL(sub string) string {
+	u := "https://" + i.Host(sub)
+	if i.Port != 0 && i.Port != 443 {
+		u += fmt.Sprintf(":%d", i.Port)
 	}
-	return r.GPU.Count
+	return u
 }
 
-// RDMAProfile describes how multi-node jobs get RDMA NICs on a GPU type.
-type RDMAProfile struct {
-	// Networks is the Multus k8s.v1.cni.cncf.io/networks list.
-	Networks []NetworkRef `json:"networks"`
-	// Resources are extra container resources (e.g. rdma/hca: 1).
-	Resources map[string]string `json:"resources,omitempty"`
+// Host returns <sub>.<domain>.
+func (i Ingress) Host(sub string) string { return sub + "." + i.Domain }
+
+// Registry is the Harbor instance holding project images.
+type Registry struct {
+	// Domain is host[:port] used for pushes and pulls.
+	Domain string `json:"domain,omitempty"`
+	// URL of the Harbor API; defaults to https://<domain>.
+	URL string `json:"url,omitempty"`
+	// Insecure skips TLS verification.
+	Insecure bool `json:"insecure,omitempty"`
+	// AdminSecret in the platform namespace holds username and password.
+	AdminSecret string `json:"adminSecret,omitempty"`
 }
 
-type NetworkRef struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+// Enabled reports whether a registry is configured.
+func (r Registry) Enabled() bool { return r.Domain != "" }
+
+// APIURL is the Harbor base URL.
+func (r Registry) APIURL() string {
+	if r.URL != "" {
+		return r.URL
+	}
+	return "https://" + r.Domain
+}
+
+// InstanceTypes controls how GPU nodes are sliced.
+type InstanceTypes struct {
+	// Reserved is kept back on every node for the system before slicing.
+	Reserved struct {
+		CPU    resource.Quantity `json:"cpu"`
+		Memory resource.Quantity `json:"memory"`
+	} `json:"reserved"`
+	// Sizes are the GPU counts offered (capped at the GPUs per node).
+	Sizes []int32 `json:"sizes,omitempty"`
+}
+
+// Quota is the default project quota.
+type Quota struct {
+	// GPUs per GPU class; "*" applies to classes not listed.
+	GPUs map[string]int32 `json:"gpus,omitempty"`
+	// Storage is the total size of all volumes.
+	Storage resource.Quantity `json:"storage"`
+	Volumes int32             `json:"volumes,omitempty"`
+	Pods    int32             `json:"pods,omitempty"`
+	// Headroom is CPU and memory allowed outside GPU jobs (file server,
+	// helper pods), on top of the GPU-derived quota.
+	Headroom struct {
+		CPU    resource.Quantity `json:"cpu"`
+		Memory resource.Quantity `json:"memory"`
+	} `json:"headroom"`
+}
+
+// GPUCount returns the default GPU quota of a class.
+func (q Quota) GPUCount(class string) int32 {
+	if n, ok := q.GPUs[class]; ok {
+		return n
+	}
+	return q.GPUs["*"]
+}
+
+// Network configures project isolation.
+type Network struct {
+	// SystemNamespaces may always reach project pods (ingress controller,
+	// monitoring).
+	SystemNamespaces []string `json:"systemNamespaces,omitempty"`
+	// DNSNamespace runs the cluster DNS, allowed when denyInternet is set.
+	DNSNamespace string `json:"dnsNamespace,omitempty"`
+}
+
+// FileServer configures the on-demand file transfer service.
+type FileServer struct {
+	Image       string          `json:"image,omitempty"`
+	IdleTimeout metav1.Duration `json:"idleTimeout,omitzero"`
+	// HostPrefix builds the host files-<namespace>.<ingress domain>.
+	HostPrefix string `json:"hostPrefix,omitempty"`
+}
+
+// Training configures job rendering and failure handling.
+type Training struct {
+	// DefaultRuntime is the ClusterTrainingRuntime used by jobs without a template.
+	DefaultRuntime string `json:"defaultRuntime,omitempty"`
+	// ShmSize of the /dev/shm emptyDir.
+	ShmSize resource.Quantity `json:"shmSize"`
+	// StuckTimeout fails a job whose pods cannot start (image pull errors,
+	// crash loops) for this long.
+	StuckTimeout metav1.Duration `json:"stuckTimeout,omitzero"`
+	// MaxRetries is the default retry count of jobs that set none.
+	MaxRetries int32 `json:"maxRetries,omitempty"`
 }
 
 type Config struct {
-	ReleaseVersion string `json:"releaseVersion"`
+	// NamespacePrefix is prepended to project names.
+	NamespacePrefix string `json:"namespacePrefix,omitempty"`
+	// APIServer is the URL written into member kubeconfigs.
+	APIServer string `json:"apiServer,omitempty"`
+	// MembersNamespace holds member ServiceAccounts and tokens, out of reach
+	// of project members.
+	MembersNamespace string `json:"membersNamespace,omitempty"`
 
-	// DefaultQueue is the Kueue LocalQueue used when a job sets none.
-	DefaultQueue     string `json:"defaultQueue"`
-	ServiceAccount   string `json:"serviceAccount,omitempty"`
-	EphemeralStorage string `json:"ephemeralStorage,omitempty"`
-	// ExtraResources are added to every worker (e.g. nextflow.io/fuse: 1).
-	ExtraResources map[string]string `json:"extraResources,omitempty"`
+	Ingress  Ingress  `json:"ingress"`
+	Registry Registry `json:"registry"`
 
-	// MultiNode settings apply when workers > 1.
-	MultiNode struct {
-		// FullNodeGPUs forces this GPU count per worker (0 = keep model count).
-		FullNodeGPUs int               `json:"fullNodeGPUs,omitempty"`
-		Env          map[string]string `json:"env,omitempty"`
-		// RDMA profiles keyed by scclabs.dev/gpu label value; "*" is the fallback.
-		RDMA map[string]RDMAProfile `json:"rdma,omitempty"`
-		// LeafTopologyKey enables soft pod affinity to keep workers under one leaf switch.
-		LeafTopologyKey string `json:"leafTopologyKey,omitempty"`
-		// PodSetTopology sets a Kueue TAS annotation, e.g.
-		// {"kueue.x-k8s.io/podset-preferred-topology": "kubernetes.io/hostname"}.
-		PodSetTopology map[string]string `json:"podSetTopology,omitempty"`
-	} `json:"multiNode"`
+	// StorageTypes maps a volume type (e.g. shared) to its StorageClass.
+	StorageTypes       map[string]StorageType `json:"storageTypes,omitempty"`
+	DefaultStorageType string                 `json:"defaultStorageType,omitempty"`
 
-	// UserNetworkPolicy creates the scc-k8s-v2 style per-user egress policy.
-	UserNetworkPolicy bool `json:"userNetworkPolicy"`
+	InstanceTypes InstanceTypes `json:"instanceTypes"`
+	DefaultQuota  Quota         `json:"defaultQuota"`
+	Network       Network       `json:"network"`
+	FileServer    FileServer    `json:"fileServer"`
+	Training      Training      `json:"training"`
 
-	// StorageTypes maps a volume type (e.g. high-perf) to its StorageClass.
-	StorageTypes map[string]StorageType `json:"storageTypes,omitempty"`
-	// Registry is the Harbor registry holding user images.
-	Registry Registry `json:"registry,omitempty"`
-	// VolumeUsage is the scc-monitor-querier endpoint reporting PVC usage.
-	VolumeUsage VolumeUsage `json:"volumeUsage,omitempty"`
-	// ImageWarmup controls node image pre-pulls.
-	ImageWarmup ImageWarmup `json:"imageWarmup,omitempty"`
-
-	Resources []Resource `json:"resources"`
+	// TrashRetention is the default retention of deleted volumes.
+	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
 }
 
-type StorageType struct {
-	StorageClass      string `json:"storageClass"`
-	DefaultAccessMode string `json:"defaultAccessMode,omitempty"`
-}
-
-type Registry struct {
-	// Domain is host[:port] of the Harbor registry.
-	Domain string `json:"domain,omitempty"`
-	// Insecure skips TLS verification (scc-k8s-v2 used verify=False).
-	Insecure bool `json:"insecure,omitempty"`
-}
-
-type VolumeUsage struct {
-	// BaseURL of scc-monitor-querier, e.g. http://scc-m-q-agent.mon.svc:8003.
-	BaseURL string `json:"baseURL,omitempty"`
-}
-
-type ImageWarmup struct {
-	// NodeSelector picks the nodes that pre-pull images.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-	// TTL after which a warmup is removed even if some nodes did not pull.
-	TTL string `json:"ttl,omitempty"`
-}
-
-// StorageType looks up a volume type.
-func (c *Config) StorageType(name string) (StorageType, error) {
+// StorageType looks up a volume type; empty selects the default.
+func (c *Config) StorageType(name string) (string, StorageType, error) {
+	if name == "" {
+		name = c.DefaultStorageType
+	}
 	if t, ok := c.StorageTypes[name]; ok && t.StorageClass != "" {
-		if t.DefaultAccessMode == "" {
-			t.DefaultAccessMode = "ReadWriteMany"
+		if t.AccessMode == "" {
+			t.AccessMode = corev1.ReadWriteMany
 		}
-		return t, nil
+		return name, t, nil
 	}
-	return StorageType{}, fmt.Errorf("volume type %q is not supported", name)
+	return "", StorageType{}, fmt.Errorf("volume type %q is not supported", name)
 }
 
-// Resource looks up a resource model.
-func (c *Config) Resource(id string) (Resource, error) {
-	for _, r := range c.Resources {
-		if r.ID == id {
-			return r, nil
-		}
+func defaultQuantity(q *resource.Quantity, v string) {
+	if q.IsZero() {
+		*q = resource.MustParse(v)
 	}
-	return Resource{}, fmt.Errorf("resource %q not found", id)
+}
+
+func defaultDuration(d *metav1.Duration, v time.Duration) {
+	if d.Duration == 0 {
+		d.Duration = v
+	}
 }
 
 // Parse parses YAML and applies defaults.
@@ -152,21 +205,51 @@ func Parse(data []byte) (*Config, error) {
 	if err := yaml.Unmarshal(data, c); err != nil {
 		return nil, fmt.Errorf("parse platform config: %w", err)
 	}
-	if c.DefaultQueue == "" {
-		c.DefaultQueue = "forgeai-queue"
+	if c.NamespacePrefix == "" {
+		c.NamespacePrefix = "forge-"
 	}
-	if c.ServiceAccount == "" {
-		c.ServiceAccount = "default"
+	if c.MembersNamespace == "" {
+		c.MembersNamespace = "forgeai-members"
 	}
-	if c.EphemeralStorage == "" {
-		c.EphemeralStorage = "50Gi"
+	if c.Ingress.Port == 0 {
+		c.Ingress.Port = 443
 	}
-	if c.ReleaseVersion == "" {
-		c.ReleaseVersion = "dev"
+	if c.Registry.AdminSecret == "" {
+		c.Registry.AdminSecret = "forgeai-harbor"
 	}
-	if c.ImageWarmup.TTL == "" {
-		c.ImageWarmup.TTL = "2h"
+	if len(c.InstanceTypes.Sizes) == 0 {
+		c.InstanceTypes.Sizes = []int32{1, 2, 4, 8}
 	}
+	defaultQuantity(&c.InstanceTypes.Reserved.CPU, "2")
+	defaultQuantity(&c.InstanceTypes.Reserved.Memory, "16Gi")
+	if c.DefaultQuota.GPUs == nil {
+		c.DefaultQuota.GPUs = map[string]int32{"*": 8}
+	}
+	defaultQuantity(&c.DefaultQuota.Storage, "1Ti")
+	defaultQuantity(&c.DefaultQuota.Headroom.CPU, "4")
+	defaultQuantity(&c.DefaultQuota.Headroom.Memory, "8Gi")
+	if c.DefaultQuota.Volumes == 0 {
+		c.DefaultQuota.Volumes = 20
+	}
+	if c.DefaultQuota.Pods == 0 {
+		c.DefaultQuota.Pods = 100
+	}
+	if c.Network.DNSNamespace == "" {
+		c.Network.DNSNamespace = "kube-system"
+	}
+	if c.FileServer.Image == "" {
+		c.FileServer.Image = "docker.io/sigoden/dufs:v0.46.0"
+	}
+	if c.FileServer.HostPrefix == "" {
+		c.FileServer.HostPrefix = "files-"
+	}
+	defaultDuration(&c.FileServer.IdleTimeout, 30*time.Minute)
+	if c.Training.DefaultRuntime == "" {
+		c.Training.DefaultRuntime = "torch-distributed"
+	}
+	defaultQuantity(&c.Training.ShmSize, "16Gi")
+	defaultDuration(&c.Training.StuckTimeout, 15*time.Minute)
+	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }
 
@@ -185,4 +268,29 @@ func Load(ctx context.Context, c client.Reader, namespace string) (*Config, erro
 		return nil, fmt.Errorf("get platform config %s/%s: %w", namespace, ConfigMapName, err)
 	}
 	return Parse([]byte(cm.Data[ConfigKey]))
+}
+
+// Loader caches the platform config for a short time.
+type Loader struct {
+	Reader    client.Reader
+	Namespace string
+
+	mu   sync.Mutex
+	cfg  *Config
+	time time.Time
+}
+
+// Get returns the cached config, reloading it after 15 seconds.
+func (l *Loader) Get(ctx context.Context) (*Config, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.cfg != nil && time.Since(l.time) < 15*time.Second {
+		return l.cfg, nil
+	}
+	cfg, err := Load(ctx, l.Reader, l.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	l.cfg, l.time = cfg, time.Now()
+	return cfg, nil
 }

@@ -8,7 +8,9 @@ rules:
   - ""
   resources:
   - configmaps
+  - nodes
   - pods
+  - pods/log
   verbs:
   - get
   - list
@@ -16,19 +18,51 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
+  - limitranges
+  - namespaces
+  - persistentvolumeclaims
+  - resourcequotas
+  - secrets
+  - serviceaccounts
+  - services
   verbs:
   - create
-  - patch
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  verbs:
   - delete
   - get
   - list
+  - patch
+  - update
   - watch
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - selfsubjectaccessreviews
+  - selfsubjectrulesreviews
+  verbs:
+  - create
 - apiGroups:
   - batch
   resources:
@@ -40,7 +74,9 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs
+  - fileservers
+  - instancetypes
+  - projects
   verbs:
   - create
   - delete
@@ -52,17 +88,42 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs/finalizers
+  - fileservers/finalizers
+  - projects/finalizers
   verbs:
   - update
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs/status
+  - fileservers/status
+  - instancetypes/status
+  - projects/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - jobset.x-k8s.io
+  resources:
+  - jobsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - clusterqueues
+  - localqueues
+  - resourceflavors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - kueue.x-k8s.io
   resources:
@@ -70,13 +131,44 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - networking.k8s.io
   resources:
+  - ingresses
   - networkpolicies
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - bind
+  - create
+  - delete
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - clustertrainingruntimes
+  verbs:
   - get
   - list
   - watch
