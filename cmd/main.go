@@ -168,8 +168,8 @@ func main() {
 		metricsServerOptions.KeyName = metricsCertKey
 	}
 
-	// Only cache pods, jobs and daemonsets created by forgeai (training jobs,
-	// pool placeholders, image warmups); the cluster runs many unrelated ones.
+	// Only cache pods, jobs and daemonsets created by forgeai (training jobs
+	// and image warmups); the cluster runs many unrelated ones.
 	req, err := labels.NewRequirement(naming.LabelComponent, selection.Exists, nil)
 	if err != nil {
 		setupLog.Error(err, "invalid label selector")
@@ -215,15 +215,6 @@ func main() {
 		ConfigNamespace: platform.Namespace(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "trainingjob")
-		os.Exit(1)
-	}
-	if err := (&controller.PoolRequestReconciler{
-		Client:          mgr.GetClient(),
-		APIReader:       mgr.GetAPIReader(),
-		Scheme:          mgr.GetScheme(),
-		ConfigNamespace: platform.Namespace(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "poolrequest")
 		os.Exit(1)
 	}
 	if err := (&controller.ImageWarmupReconciler{

@@ -21,22 +21,16 @@ const (
 	LabelPodName      = "pod.scclabs.dev/name"
 	LabelResourceID   = "pod.scclabs.dev/resource-id"
 	LabelTrainerJobID = "pod.scclabs.dev/trainer-job-id"
-	LabelNodePool     = "scclabs.dev/pool"
 	LabelGPU          = "scclabs.dev/gpu"
 	LabelCompletion   = "batch.kubernetes.io/job-completion-index"
 	LabelVolumeID     = "pod.scclabs.dev/volume-id"
 	LabelJobName      = "job-name"
 
-	// Pool request labels (scc-k8s-v2 pool placeholders).
-	LabelPoolRequestID  = "pool.scclabs.dev/request-id"
-	LabelPoolRequestSrc = "pool.scclabs.dev/src-pool"
-	LabelPoolRequestDst = "pool.scclabs.dev/dst-pool"
-
 	// LabelTrainingJob is set on every object owned by a TrainingJob (value = CR name).
 	LabelTrainingJob = "forgeai.scclabs.dev/training-job"
 
 	// LabelComponent marks every object the operator manages (training,
-	// pool-placeholder, image-warmup); the operator caches only these.
+	// image-warmup); the operator caches only these.
 	LabelComponent = "forgeai.scclabs.dev/component"
 	// LabelImageWarmup is the warmup ID (hash of the image) on warmup DaemonSets.
 	LabelImageWarmup = "forgeai.scclabs.dev/image-warmup"
@@ -48,18 +42,13 @@ const (
 	// AnnotationRestartGeneration records which restartGeneration created a TrainJob.
 	AnnotationRestartGeneration = "forgeai.scclabs.dev/restart-generation"
 
-	AppNameTrainingJob     = "forgeai-training"
-	AppNameVolume          = "volume"
-	AppNamePoolPlaceholder = "pool-placeholder"
-	AppNameImageWarmup     = "forgeai-image-warmup"
-	ManagedBy              = "forgeai"
+	AppNameTrainingJob = "forgeai-training"
+	AppNameVolume      = "volume"
+	AppNameImageWarmup = "forgeai-image-warmup"
+	ManagedBy          = "forgeai"
 
-	ComponentTraining        = "training"
-	ComponentPoolPlaceholder = "pool-placeholder"
-	ComponentImageWarmup     = "image-warmup"
-
-	// DefaultPool is the pool of nodes without a pool request.
-	DefaultPool = "default"
+	ComponentTraining    = "training"
+	ComponentImageWarmup = "image-warmup"
 )
 
 const (
@@ -109,11 +98,6 @@ func NetworkPolicyName(namespace, userID string) string {
 }
 
 func RuntimeName(job string) string { return job + "-runtime" }
-
-// PoolRequestName is the PoolRequest (and placeholder Job) name: p-{userHash}-{requestID}.
-func PoolRequestName(namespace, userID, requestID string) string {
-	return JobName(namespace, userID, requestID)
-}
 
 // ImageWarmupName is the warmup DaemonSet name of an image.
 func ImageWarmupName(image string) string {

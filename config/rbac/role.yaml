@@ -21,13 +21,6 @@ rules:
   - create
   - patch
 - apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - patch
-- apiGroups:
   - apps
   resources:
   - daemonsets
@@ -41,15 +34,12 @@ rules:
   resources:
   - jobs
   verbs:
-  - create
-  - delete
   - get
   - list
   - watch
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - poolrequests
   - trainingjobs
   verbs:
   - create
@@ -62,14 +52,12 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - poolrequests/finalizers
   - trainingjobs/finalizers
   verbs:
   - update
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - poolrequests/status
   - trainingjobs/status
   verbs:
   - get
