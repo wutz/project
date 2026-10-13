@@ -28,7 +28,10 @@ func TestNames(t *testing.T) {
 	if job != "p-f6dd867476db-ackjob-001" {
 		t.Fatalf("JobName=%s", job)
 	}
-	if got := SSHUser("ackjob-001", 1); got != "root@ackjob-001-1" {
-		t.Fatalf("SSHUser=%s", got)
+	if got := VolumeClaimName("pod-prod", "SELF-Y7bM92P1CRvbTeCDmb2jSdzF7KhEQNSPyEeVELNgHGg", "vol-1"); got != "p-f6dd867476db-vol-1" {
+		t.Fatalf("VolumeClaimName=%s", got)
+	}
+	if a, b := ImageWarmupName("img:1"), ImageWarmupName("img:2"); a == b || len(a) != len("forgeai-warmup-")+16 {
+		t.Fatalf("ImageWarmupName=%s %s", a, b)
 	}
 }

@@ -25,6 +25,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -167,9 +168,9 @@ func main() {
 		metricsServerOptions.KeyName = metricsCertKey
 	}
 
-	// Only cache core objects that belong to a TrainingJob; the cluster may run
-	// many unrelated pods, jobs and secrets.
-	req, err := labels.NewRequirement(naming.LabelTrainingJob, selection.Exists, nil)
+	// Only cache pods, jobs and daemonsets created by forgeai (training jobs,
+	// pool placeholders, image warmups); the cluster runs many unrelated ones.
+	req, err := labels.NewRequirement(naming.LabelComponent, selection.Exists, nil)
 	if err != nil {
 		setupLog.Error(err, "invalid label selector")
 		os.Exit(1)
@@ -180,10 +181,8 @@ func main() {
 		Scheme: scheme,
 		Cache: cache.Options{ByObject: map[client.Object]cache.ByObject{
 			&corev1.Pod{}:                 owned,
-			&corev1.Service{}:             owned,
-			&corev1.Secret{}:              owned,
 			&batchv1.Job{}:                owned,
-			&networkingv1.Ingress{}:       owned,
+			&appsv1.DaemonSet{}:           owned,
 			&networkingv1.NetworkPolicy{}: owned,
 		}},
 		Client:                 client.Options{Cache: &client.CacheOptions{Unstructured: true}},
@@ -216,6 +215,21 @@ func main() {
 		ConfigNamespace: platform.Namespace(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "trainingjob")
+		os.Exit(1)
+	}
+	if err := (&controller.PoolRequestReconciler{
+		Client:          mgr.GetClient(),
+		APIReader:       mgr.GetAPIReader(),
+		Scheme:          mgr.GetScheme(),
+		ConfigNamespace: platform.Namespace(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "poolrequest")
+		os.Exit(1)
+	}
+	if err := (&controller.ImageWarmupReconciler{
+		Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "imagewarmup")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

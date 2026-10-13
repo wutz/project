@@ -1,0 +1,14 @@
+apiVersion: forgeai.scclabs.dev/v1alpha1
+kind: PoolRequest
+metadata:
+  labels:
+    app.kubernetes.io/name: forgeai
+    app.kubernetes.io/managed-by: kustomize
+  name: poolrequest-sample
+spec:
+  userID: u1
+  requestID: req-001
+  srcPool: default
+  dstPool: ackpool-mypool
+  resourceID: rtx5090.xeon6530.8xlarge
+  nnodes: 1

@@ -23,27 +23,33 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - secrets
-  - services
+  - nodes
   verbs:
-  - create
+  - get
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
   - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - batch
   resources:
   - jobs
   verbs:
+  - create
+  - delete
   - get
   - list
   - watch
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
+  - poolrequests
   - trainingjobs
   verbs:
   - create
@@ -56,12 +62,14 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
+  - poolrequests/finalizers
   - trainingjobs/finalizers
   verbs:
   - update
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
+  - poolrequests/status
   - trainingjobs/status
   verbs:
   - get
@@ -78,27 +86,11 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
-  - ingresses
   - networkpolicies
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - sshpiper.com
-  resources:
-  - pipes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - trainer.kubeflow.org

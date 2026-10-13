@@ -18,4 +18,13 @@ resources:
   kind: TrainingJob
   path: github.com/scclabs/forgeai/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: scclabs.dev
+  group: forgeai
+  kind: PoolRequest
+  path: github.com/scclabs/forgeai/api/v1alpha1
+  version: v1alpha1
 version: "3"
