@@ -7,8 +7,3 @@ builds:
   main: ./cmd
   ldflags:
   - -s -w
-- id: compat-api
-  dir: ./compat-api
-  main: ./cmd/compat-api
-  ldflags:
-  - -s -w

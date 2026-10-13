@@ -193,7 +193,7 @@ deploy-dev: render-dev ## Build images with ko and deploy to the current kube co
 	"$(KUBECTL)" apply --server-side -f dist/dev.yaml
 
 .PHONY: undeploy-dev
-undeploy-dev: kustomize ## Remove the dev deployment (deletes the CRD and all TrainingJobs).
+undeploy-dev: kustomize ## Remove the dev deployment (deletes the CRDs and all forgeai objects).
 	"$(KUSTOMIZE)" build deploy/dev | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: gui

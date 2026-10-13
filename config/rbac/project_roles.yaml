@@ -1,0 +1,63 @@
+# Roles bound by the operator for Project members. Members are ServiceAccounts
+# in forgeai-members; "edit" or "view" is bound in the project namespace. The
+# operator also creates forgeai:project:<name>, granting members read access
+# to their Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes.
+#
+# Members cannot change quotas, network policies, RBAC or namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: project-edit
+rules:
+- apiGroups: [""]
+  resources: [persistentvolumeclaims]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [pods, pods/log, events, resourcequotas, limitranges, serviceaccounts, configmaps]
+  verbs: [get, list, watch]
+- apiGroups: [""]
+  # Registry robot and file server credentials.
+  resources: [secrets]
+  verbs: [get, list, watch]
+- apiGroups: [events.k8s.io]
+  resources: [events]
+  verbs: [get, list, watch]
+- apiGroups: [batch]
+  resources: [jobs]
+  verbs: [get, list, watch]
+- apiGroups: [trainer.kubeflow.org]
+  resources: [trainjobs, trainingruntimes]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [jobset.x-k8s.io]
+  resources: [jobsets]
+  verbs: [get, list, watch]
+- apiGroups: [kueue.x-k8s.io]
+  resources: [localqueues, workloads]
+  verbs: [get, list, watch]
+- apiGroups: [forgeai.scclabs.dev]
+  resources: [fileservers]
+  verbs: [get, list, watch, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: project-view
+rules:
+- apiGroups: [""]
+  resources: [persistentvolumeclaims, pods, pods/log, events, resourcequotas, limitranges]
+  verbs: [get, list, watch]
+- apiGroups: [events.k8s.io]
+  resources: [events]
+  verbs: [get, list, watch]
+- apiGroups: [batch]
+  resources: [jobs]
+  verbs: [get, list, watch]
+- apiGroups: [trainer.kubeflow.org]
+  resources: [trainjobs, trainingruntimes]
+  verbs: [get, list, watch]
+- apiGroups: [kueue.x-k8s.io]
+  resources: [localqueues, workloads]
+  verbs: [get, list, watch]
+- apiGroups: [forgeai.scclabs.dev]
+  resources: [fileservers]
+  verbs: [get, list, watch]

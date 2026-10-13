@@ -1,0 +1,23 @@
+apiVersion: forgeai.scclabs.dev/v1alpha1
+kind: Project
+metadata:
+  name: demo
+spec:
+  displayName: Demo project
+  quota:
+    gpus:
+    - class: rtx-5090
+      count: 8
+    storage: 1Ti
+    volumes: 10
+    registryStorage: 200Gi
+  network:
+    isolation: Isolated
+    denyInternet: false
+  members:
+  - name: alice
+    role: edit
+  - name: bob
+    role: view
+  trashRetention: 168h
+  deletionPolicy: Retain

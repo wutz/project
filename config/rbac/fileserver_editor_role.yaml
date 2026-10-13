@@ -11,12 +11,12 @@ metadata:
   labels:
     app.kubernetes.io/name: forgeai
     app.kubernetes.io/managed-by: kustomize
-  name: trainingjob-editor-role
+  name: fileserver-editor-role
 rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs
+  - fileservers
   verbs:
   - create
   - delete
@@ -28,6 +28,6 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs/status
+  - fileservers/status
   verbs:
   - get

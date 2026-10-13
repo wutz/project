@@ -1,114 +1,153 @@
-// Package naming holds object names and label keys shared by the operator,
-// the compat API and the GUI. Names follow scc-k8s-v2 so job IDs and PVCs
-// stay compatible.
+// Package naming holds object names, label keys and annotations shared by the
+// operator and the GUI.
 package naming
 
 import (
-	"fmt"
-	"strconv"
+	"regexp"
 	"strings"
 )
 
-// Label keys (compatible with scc-k8s-v2).
+// Labels and annotations.
 const (
-	LabelAppName      = "app.kubernetes.io/name"
-	LabelAppInstance  = "app.kubernetes.io/instance"
-	LabelAppVersion   = "app.kubernetes.io/version"
-	LabelManagedBy    = "app.kubernetes.io/managed-by"
-	LabelUserID       = "user.scclabs.dev/id"
-	LabelUserGroup    = "user.scclabs.dev/group"
-	LabelPodID        = "pod.scclabs.dev/id"
-	LabelPodName      = "pod.scclabs.dev/name"
-	LabelResourceID   = "pod.scclabs.dev/resource-id"
-	LabelTrainerJobID = "pod.scclabs.dev/trainer-job-id"
-	LabelGPU          = "scclabs.dev/gpu"
-	LabelCompletion   = "batch.kubernetes.io/job-completion-index"
-	LabelVolumeID     = "pod.scclabs.dev/volume-id"
-	LabelJobName      = "job-name"
+	LabelManagedBy = "app.kubernetes.io/managed-by"
+	LabelComponent = "app.kubernetes.io/component"
+	ManagedBy      = "forgeai"
 
-	// LabelTrainingJob is set on every object owned by a TrainingJob (value = CR name).
-	LabelTrainingJob = "forgeai.scclabs.dev/training-job"
+	// LabelProject is set on project namespaces and every object forgeai
+	// creates for a project (value = Project name).
+	LabelProject = "forgeai.scclabs.dev/project"
+	// LabelMember is set on member ServiceAccounts and token Secrets.
+	LabelMember = "forgeai.scclabs.dev/member"
 
-	// LabelComponent marks every object the operator manages (training,
-	// image-warmup); the operator caches only these.
-	LabelComponent = "forgeai.scclabs.dev/component"
-	// LabelImageWarmup is the warmup ID (hash of the image) on warmup DaemonSets.
-	LabelImageWarmup = "forgeai.scclabs.dev/image-warmup"
-	// AnnotationExpires is when a warmup DaemonSet is removed (RFC3339).
-	AnnotationExpires = "forgeai.scclabs.dev/expires"
-	// AnnotationImage is the image a warmup DaemonSet pulls.
-	AnnotationImage = "forgeai.scclabs.dev/image"
+	// LabelTrash marks a volume (PVC) in the trash.
+	LabelTrash = "forgeai.scclabs.dev/trash"
+	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
+	AnnotationTrashedAt = "forgeai.scclabs.dev/trashed-at"
+	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).
+	AnnotationExpireAt = "forgeai.scclabs.dev/expire-at"
+	// LabelVolumeType is the platform storage type of a volume.
+	LabelVolumeType = "forgeai.scclabs.dev/volume-type"
 
-	// AnnotationRestartGeneration records which restartGeneration created a TrainJob.
-	AnnotationRestartGeneration = "forgeai.scclabs.dev/restart-generation"
+	// AnnotationLastActive is a client heartbeat on a FileServer (RFC3339).
+	AnnotationLastActive = "forgeai.scclabs.dev/last-active"
 
-	AppNameTrainingJob = "forgeai-training"
-	AppNameVolume      = "volume"
-	AppNameImageWarmup = "forgeai-image-warmup"
-	ManagedBy          = "forgeai"
+	// LabelTemplate marks a TrainingRuntime as a user job template.
+	LabelTemplate = "forgeai.scclabs.dev/template"
+	// AnnotationDescription describes a template.
+	AnnotationDescription = "forgeai.scclabs.dev/description"
+	// LabelInstanceType is the InstanceType of a TrainJob.
+	LabelInstanceType = "forgeai.scclabs.dev/instance-type"
+	// LabelJobGroup groups a TrainJob with its retries (value = first job name).
+	LabelJobGroup = "forgeai.scclabs.dev/job-group"
+	// AnnotationMaxRetries is how often a failed TrainJob is resubmitted.
+	AnnotationMaxRetries = "forgeai.scclabs.dev/max-retries"
+	// AnnotationRetryOn is Infra (default) or Any.
+	AnnotationRetryOn = "forgeai.scclabs.dev/retry-on"
+	// AnnotationRetry is the attempt number of a resubmitted TrainJob.
+	AnnotationRetry = "forgeai.scclabs.dev/retry"
+	// AnnotationFailureReason is the failure classification of a TrainJob.
+	AnnotationFailureReason = "forgeai.scclabs.dev/failure-reason"
+	// AnnotationFailureMessage details the failure.
+	AnnotationFailureMessage = "forgeai.scclabs.dev/failure-message"
+	// AnnotationRetriedAs is the name of the TrainJob that retried this one.
+	AnnotationRetriedAs = "forgeai.scclabs.dev/retried-as"
 
-	ComponentTraining    = "training"
-	ComponentImageWarmup = "image-warmup"
+	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
+	LabelGPUClass = "forgeai.scclabs.dev/gpu-class"
+
+	// Node labels from NVIDIA GPU feature discovery.
+	LabelGPUProduct = "nvidia.com/gpu.product"
+	LabelGPUCount   = "nvidia.com/gpu.count"
+	LabelGPUMemory  = "nvidia.com/gpu.memory"
+
+	ComponentFileServer = "fileserver"
 )
 
+// Fixed names inside a project namespace.
 const (
-	fnvOffset64 uint64 = 14695981039346656037
-	fnvPrime64  uint64 = 1099511628211
+	LocalQueueName       = "default"
+	RegistrySecretName   = "forgeai-registry"
+	FileServerName       = "default"
+	FileServerSecretName = "forgeai-fileserver"
+	NetworkPolicyName    = "forgeai-isolation"
+	ResourceQuotaName    = "forgeai-quota"
+	LimitRangeName       = "forgeai-defaults"
 )
 
-// fnv1a mirrors the Python fnv1a package: 64-bit FNV-1a over unicode code points,
-// rendered as lowercase hex without leading zeros.
-func fnv1a(s string) string {
-	h := fnvOffset64
-	for _, r := range s {
-		h ^= uint64(r)
-		h *= fnvPrime64
+// ClusterRolePrefix + role (edit, view) is bound per member in the project
+// namespace (see config/rbac/project_roles.yaml).
+const ClusterRolePrefix = "forgeai-project-"
+
+// Namespace is the namespace of a project.
+func Namespace(prefix, project string) string { return prefix + project }
+
+// ClusterQueue is the Kueue ClusterQueue of a project.
+func ClusterQueue(namespace string) string { return namespace }
+
+// ProjectClusterRole is the per-project ClusterRole (and binding) granting
+// members read access to the Project, its ClusterQueue and cluster-wide
+// catalogues.
+func ProjectClusterRole(project string) string { return "forgeai:project:" + project }
+
+// MemberServiceAccount is the ServiceAccount of a member in the members
+// namespace. Project and member names are DNS labels, so the dot keeps
+// names unique.
+func MemberServiceAccount(project, member string) string { return project + "." + member }
+
+// MemberTokenSecret is the long-lived token Secret of a member.
+func MemberTokenSecret(project, member string) string { return project + "." + member + ".token" }
+
+// MemberRoleBinding binds a member to its role in the project namespace.
+func MemberRoleBinding(member string) string { return "forgeai-member-" + member }
+
+var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+// GPUClass normalises a nvidia.com/gpu.product value (NVIDIA-GeForce-RTX-5090)
+// to a short DNS label (rtx-5090).
+func GPUClass(product string) string {
+	s := strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(product), "-"), "-")
+	for _, p := range []string{"nvidia-", "geforce-", "tesla-"} {
+		s = strings.TrimPrefix(s, p)
 	}
-	return strconv.FormatUint(h, 16)
-}
-
-// UserHash returns the 12 char user hash used in object names.
-func UserHash(namespace, userID string) string {
-	if userID == "public" || userID == "pod" {
-		return userID
+	if len(s) > 40 {
+		s = strings.TrimRight(s[:40], "-")
 	}
-	if namespace != "pod" {
-		userID = namespace + "-" + userID
+	return s
+}
+
+// InstanceTypeName is the InstanceType of count GPUs of a class, e.g. rtx-5090.x2.
+func InstanceTypeName(class string, count int32) string {
+	return class + ".x" + itoa(count)
+}
+
+// ResourceFlavor is the Kueue ResourceFlavor of a GPU class.
+func ResourceFlavor(class string) string { return "forgeai-" + class }
+
+func itoa(n int32) string {
+	if n == 0 {
+		return "0"
 	}
-	h := fnv1a(userID)
-	if len(h) < 16 {
-		h = strings.Repeat("0", 16-len(h)) + h
+	var b [11]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
 	}
-	return h[:12]
+	return string(b[i:])
 }
 
-// JobName is the TrainingJob (and TrainJob) name: p-{userHash}-{jobID}.
-func JobName(namespace, userID, jobID string) string {
-	return strings.ToLower(fmt.Sprintf("p-%s-%s", UserHash(namespace, userID), jobID))
-}
+// Keys of unstructured object maps.
+const (
+	KeyAPIVersion = "apiVersion"
+	KeyKind       = "kind"
+	KeyMetadata   = "metadata"
+	KeyName       = "name"
+	KeyNamespace  = "namespace"
+	KeyLabels     = "labels"
+	KeySpec       = "spec"
+	KeyStatus     = "status"
+)
 
-// VolumeClaimName is the PVC name of a user volume.
-func VolumeClaimName(namespace, userID, volumeID string) string {
-	return fmt.Sprintf("p-%s-%s", UserHash(namespace, userID), volumeID)
-}
-
-// NetworkPolicyName is the per-user egress policy name.
-func NetworkPolicyName(namespace, userID string) string {
-	return JobName(namespace, userID, "default")
-}
-
-func RuntimeName(job string) string { return job + "-runtime" }
-
-// ImageWarmupName is the warmup DaemonSet name of an image.
-func ImageWarmupName(image string) string {
-	return "forgeai-warmup-" + ImageWarmupID(image)
-}
-
-// ImageWarmupID is a stable short hash of an image reference.
-func ImageWarmupID(image string) string {
-	h := fnv1a(image)
-	if len(h) < 16 {
-		h = strings.Repeat("0", 16-len(h)) + h
-	}
-	return h
-}
+// LiteralTrue is the string form of a boolean true in labels and annotations.
+const LiteralTrue = "true"

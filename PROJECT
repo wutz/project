@@ -11,11 +11,33 @@ repo: github.com/scclabs/forgeai
 resources:
 - api:
     crdVersion: v1
+  controller: true
+  domain: scclabs.dev
+  group: forgeai
+  kind: Project
+  path: github.com/scclabs/forgeai/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: scclabs.dev
+  group: forgeai
+  kind: InstanceType
+  path: github.com/scclabs/forgeai/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
     namespaced: true
   controller: true
   domain: scclabs.dev
   group: forgeai
-  kind: TrainingJob
+  kind: FileServer
   path: github.com/scclabs/forgeai/api/v1alpha1
   version: v1alpha1
+- controller: true
+  core: true
+  group: core
+  kind: PersistentVolumeClaim
+  path: k8s.io/api/core/v1
+  version: v1
 version: "3"

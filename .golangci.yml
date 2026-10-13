@@ -52,6 +52,17 @@ linters:
           - dupl
           - lll
         path: internal/*
+      # Table-driven tests and fake servers repeat literals and branches on
+      # purpose; keeping them literal makes the cases easier to read.
+      - linters:
+          - goconst
+          - gocyclo
+          - lll
+        path: _test\.go
+      - linters:
+          - goconst
+          - gocyclo
+        path: pkg/harbor/harbortest/
     paths:
       - third_party$
       - builtin$

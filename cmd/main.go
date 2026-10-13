@@ -26,13 +26,13 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -168,23 +168,28 @@ func main() {
 		metricsServerOptions.KeyName = metricsCertKey
 	}
 
-	// Only cache pods, jobs and daemonsets created by forgeai (training jobs
-	// and image warmups); the cluster runs many unrelated ones.
-	req, err := labels.NewRequirement(naming.LabelComponent, selection.Exists, nil)
-	if err != nil {
-		setupLog.Error(err, "invalid label selector")
-		os.Exit(1)
-	}
-	owned := cache.ByObject{Label: labels.NewSelector().Add(*req)}
-
+	// Cache only the forgeai-managed instances of high-volume or sensitive
+	// kinds; pods, PVCs, nodes and namespaces are cached in full because
+	// instance availability and the volume trash need all of them.
+	managed := cache.ByObject{Label: labels.SelectorFromSet(labels.Set{naming.LabelManagedBy: naming.ManagedBy})}
+	platformNS := cache.ByObject{Namespaces: map[string]cache.Config{platform.Namespace(): {}}}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
-		Cache: cache.Options{ByObject: map[client.Object]cache.ByObject{
-			&corev1.Pod{}:                 owned,
-			&batchv1.Job{}:                owned,
-			&appsv1.DaemonSet{}:           owned,
-			&networkingv1.NetworkPolicy{}: owned,
-		}},
+		Cache: cache.Options{
+			DefaultTransform: cache.TransformStripManagedFields(),
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}:              managed,
+				&corev1.ServiceAccount{}:      managed,
+				&corev1.ResourceQuota{}:       managed,
+				&corev1.LimitRange{}:          managed,
+				&corev1.Service{}:             managed,
+				&corev1.ConfigMap{}:           platformNS,
+				&appsv1.Deployment{}:          managed,
+				&networkingv1.NetworkPolicy{}: managed,
+				&networkingv1.Ingress{}:       managed,
+				&rbacv1.RoleBinding{}:         managed,
+			},
+		},
 		Client:                 client.Options{Cache: &client.CacheOptions{Unstructured: true}},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
@@ -208,20 +213,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.TrainingJobReconciler{
-		Client:          mgr.GetClient(),
-		APIReader:       mgr.GetAPIReader(),
-		Scheme:          mgr.GetScheme(),
-		ConfigNamespace: platform.Namespace(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "trainingjob")
+	cfg := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: platform.Namespace()}
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "Failed to create clientset")
 		os.Exit(1)
 	}
-	if err := (&controller.ImageWarmupReconciler{
-		Client: mgr.GetClient(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "imagewarmup")
-		os.Exit(1)
+	for name, r := range map[string]interface{ SetupWithManager(ctrl.Manager) error }{
+		"project": &controller.ProjectReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: cfg,
+		},
+		"registry": &controller.RegistryReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
+		},
+		"instancetype": &controller.InstanceTypeReconciler{Client: mgr.GetClient(), Config: cfg},
+		"fileserver": &controller.FileServerReconciler{
+			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg, Activity: controller.LogActivity(clientset),
+		},
+		"volume-trash": &controller.PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: cfg},
+		"trainjob": &controller.TrainJobReconciler{
+			Client: mgr.GetClient(), Config: cfg, Recorder: mgr.GetEventRecorder("forgeai-trainjob"),
+		},
+	} {
+		if err := r.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", name)
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

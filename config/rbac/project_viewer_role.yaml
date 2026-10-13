@@ -11,12 +11,12 @@ metadata:
   labels:
     app.kubernetes.io/name: forgeai
     app.kubernetes.io/managed-by: kustomize
-  name: trainingjob-viewer-role
+  name: project-viewer-role
 rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs
+  - projects
   verbs:
   - get
   - list
@@ -24,6 +24,6 @@ rules:
 - apiGroups:
   - forgeai.scclabs.dev
   resources:
-  - trainingjobs/status
+  - projects/status
   verbs:
   - get
