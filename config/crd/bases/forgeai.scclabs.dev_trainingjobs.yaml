@@ -92,10 +92,6 @@ spec:
                 maxLength: 40
                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                 type: string
-              poolID:
-                default: default
-                description: poolID selects the node pool (scclabs.dev/pool label).
-                type: string
               queueName:
                 description: queueName is the Kueue LocalQueue; defaults to the platform
                   default queue.

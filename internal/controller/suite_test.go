@@ -113,12 +113,6 @@ var _ = BeforeSuite(func() {
 		Scheme:          mgr.GetScheme(),
 		ConfigNamespace: configNamespace,
 	}).SetupWithManager(mgr)).To(Succeed())
-	Expect((&PoolRequestReconciler{
-		Client:          mgr.GetClient(),
-		APIReader:       mgr.GetAPIReader(),
-		Scheme:          mgr.GetScheme(),
-		ConfigNamespace: configNamespace,
-	}).SetupWithManager(mgr)).To(Succeed())
 	Expect((&ImageWarmupReconciler{Client: mgr.GetClient()}).SetupWithManager(mgr)).To(Succeed())
 
 	go func() {

@@ -22,7 +22,8 @@ func TestParseDevConfig(t *testing.T) {
 	if r.GPUCount() != 1 || r.Labels["scclabs.dev/gpu"] != "rtx-5090" {
 		t.Errorf("unexpected resource %+v", r)
 	}
-	if st, err := c.StorageType("high-perf"); err != nil || st.StorageClass == "" || st.DefaultAccessMode != "ReadWriteMany" {
+	st, err := c.StorageType("high-perf")
+	if err != nil || st.StorageClass == "" || st.DefaultAccessMode != "ReadWriteMany" {
 		t.Errorf("StorageType(high-perf) = %+v, %v", st, err)
 	}
 	if _, err := c.StorageType("nope"); err == nil {

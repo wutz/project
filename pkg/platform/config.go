@@ -97,9 +97,6 @@ type Config struct {
 	VolumeUsage VolumeUsage `json:"volumeUsage,omitempty"`
 	// ImageWarmup controls node image pre-pulls.
 	ImageWarmup ImageWarmup `json:"imageWarmup,omitempty"`
-	// PoolPlaceholderImage is the image of the pods holding nodes during a
-	// pool transfer; it only sleeps.
-	PoolPlaceholderImage string `json:"poolPlaceholderImage,omitempty"`
 
 	Resources []Resource `json:"resources"`
 }
@@ -169,9 +166,6 @@ func Parse(data []byte) (*Config, error) {
 	}
 	if c.ImageWarmup.TTL == "" {
 		c.ImageWarmup.TTL = "2h"
-	}
-	if c.PoolPlaceholderImage == "" {
-		c.PoolPlaceholderImage = "registry.k8s.io/pause:3.10"
 	}
 	return c, nil
 }

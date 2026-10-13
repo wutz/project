@@ -9,9 +9,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// Group and Version of the Kubeflow Trainer v2 API.
+const (
+	Group   = "trainer.kubeflow.org"
+	Version = "v1alpha1"
+)
+
 var (
-	TrainJobGVK        = schema.GroupVersionKind{Group: "trainer.kubeflow.org", Version: "v1alpha1", Kind: "TrainJob"}
-	TrainingRuntimeGVK = schema.GroupVersionKind{Group: "trainer.kubeflow.org", Version: "v1alpha1", Kind: "TrainingRuntime"}
+	TrainJobGVK        = schema.GroupVersionKind{Group: Group, Version: Version, Kind: "TrainJob"}
+	TrainingRuntimeGVK = schema.GroupVersionKind{Group: Group, Version: Version, Kind: "TrainingRuntime"}
 )
 
 const (

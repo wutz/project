@@ -1,5 +1,4 @@
 ## Append samples of your project ##
 resources:
 - forgeai_v1alpha1_trainingjob.yaml
-- forgeai_v1alpha1_poolrequest.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

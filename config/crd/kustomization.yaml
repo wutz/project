@@ -3,7 +3,6 @@
 # It should be run by config/default
 resources:
 - bases/forgeai.scclabs.dev_trainingjobs.yaml
-- bases/forgeai.scclabs.dev_poolrequests.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
