@@ -200,6 +200,10 @@ undeploy-dev: kustomize ## Remove the dev deployment (deletes the CRDs and all f
 gui: ## Build the Wails desktop client (gui/build/bin).
 	cd gui && wails build -clean
 
+.PHONY: gui-dev
+gui-dev: ## Run the Wails dev server without breaking the packaged app (see hack/gui-dev.sh).
+	./hack/gui-dev.sh $(GUI_DEV_ARGS)
+
 ##@ Dependencies
 
 ## Location to install dependencies to
