@@ -44,11 +44,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/instancetype"
-	"github.com/scclabs/forgeai/pkg/kf"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/instancetype"
+	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 const (

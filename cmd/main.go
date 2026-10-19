@@ -43,10 +43,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	forgeaiv1alpha1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/internal/controller"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/internal/controller"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 	// +kubebuilder:scaffold:imports
 )
 

@@ -36,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/harbor"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/harbor"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 const (

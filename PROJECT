@@ -7,7 +7,7 @@ domain: scclabs.dev
 layout:
 - go.kubebuilder.io/v4
 projectName: forgeai
-repo: github.com/scclabs/forgeai
+repo: github.com/wutz/forgeai
 resources:
 - api:
     crdVersion: v1
@@ -15,7 +15,7 @@ resources:
   domain: scclabs.dev
   group: forgeai
   kind: Project
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -23,7 +23,7 @@ resources:
   domain: scclabs.dev
   group: forgeai
   kind: InstanceType
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -32,7 +32,7 @@ resources:
   domain: scclabs.dev
   group: forgeai
   kind: FileServer
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - controller: true
   core: true

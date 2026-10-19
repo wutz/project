@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/scclabs/forgeai/pkg/harbor"
-	"github.com/scclabs/forgeai/pkg/harbor/harbortest"
+	"github.com/wutz/forgeai/pkg/harbor"
+	"github.com/wutz/forgeai/pkg/harbor/harbortest"
 )
 
 func TestProjectLifecycle(t *testing.T) {
