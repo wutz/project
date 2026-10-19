@@ -8,12 +8,12 @@ rules:
   - ""
   resources:
   - configmaps
-  - nodes
-  - pods
-  - pods/log
   verbs:
+  - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -32,6 +32,16 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ""
