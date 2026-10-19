@@ -47,6 +47,7 @@ import (
 	"github.com/wutz/forgeai/internal/controller"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/sandbox"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -234,12 +235,21 @@ func main() {
 		"trainjob": &controller.TrainJobReconciler{
 			Client: mgr.GetClient(), Config: cfg, Recorder: mgr.GetEventRecorder("forgeai-trainjob"),
 		},
-		"sandbox": &controller.SandboxReconciler{Client: mgr.GetClient(), Config: cfg},
 	} {
 		if err := r.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "Failed to create controller", "controller", name)
 			os.Exit(1)
 		}
+	}
+	// agent-sandbox is optional: without its CRDs the rest of forgeai still
+	// runs, and the Sandbox controller is registered once they are installed.
+	gvk := sandbox.SandboxGVK
+	if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
+		setupLog.Info("agent-sandbox CRDs are not installed; the Sandbox controller is off")
+	} else if err := (&controller.SandboxReconciler{Client: mgr.GetClient(), Config: cfg}).
+		SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "sandbox")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
