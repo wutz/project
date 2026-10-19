@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -74,6 +75,39 @@ type Form struct {
 }
 
 var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
+
+// nanos is a duration in nanoseconds, the shape of the GUI's duration model.
+type nanos int64
+
+// UnmarshalJSON accepts both encodings of the auto-stop duration that reach
+// this struct: a Go duration string ("1h0m0s"), which is what metav1.Duration
+// marshals to, and the {"Duration": <nanoseconds>} object the generated Wails
+// model sends from the GUI form.
+func (f *Form) UnmarshalJSON(data []byte) error {
+	type form Form // without methods, so this decoder does not recurse
+	var decoded form
+	if err := json.Unmarshal(data, &decoded); err == nil {
+		*f = Form(decoded)
+		return nil
+	}
+	// The duration arrives as an object: decode every field through form and
+	// take ttl from the object's Duration field.
+	var model struct {
+		*form
+		TTL *struct {
+			Duration nanos `json:"Duration"`
+		} `json:"ttl"`
+	}
+	model.form = &decoded
+	if err := json.Unmarshal(data, &model); err != nil {
+		return err
+	}
+	if model.TTL != nil {
+		decoded.TTL = metav1.Duration{Duration: time.Duration(model.TTL.Duration)}
+	}
+	*f = Form(decoded)
+	return nil
+}
 
 // Validate checks a form; it does not look up the instance type or volumes.
 func (f *Form) Validate() error {

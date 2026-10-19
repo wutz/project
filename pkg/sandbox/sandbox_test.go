@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -175,6 +176,33 @@ func TestValidate(t *testing.T) {
 		if err := f.Validate(); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
+	}
+}
+
+func TestFormUnmarshalTTL(t *testing.T) {
+	cases := map[string]struct {
+		data string
+		want time.Duration
+	}{
+		"duration string": {`{"name":"agent","image":"img","ttl":"1h30m0s"}`, 90 * time.Minute},
+		"gui model object": {`{"name":"agent","image":"img","ttl":{"Duration":5400000000000}}`,
+			90 * time.Minute},
+		"no ttl": {`{"name":"agent","image":"img"}`, 0},
+	}
+	for name, c := range cases {
+		var f Form
+		if err := json.Unmarshal([]byte(c.data), &f); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if f.TTL.Duration != c.want {
+			t.Errorf("%s: ttl = %s, want %s", name, f.TTL.Duration, c.want)
+		}
+		if f.Name != "agent" || f.Image != "img" {
+			t.Errorf("%s: lost plain fields: %+v", name, f)
+		}
+	}
+	if err := json.Unmarshal([]byte(`{"ttl":{"Duration":"nope"}}`), &Form{}); err == nil {
+		t.Error("expected an error for a non-numeric duration")
 	}
 }
 
