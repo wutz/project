@@ -180,7 +180,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 ##@ Dev cluster (ko)
 
 KO ?= ko
-KO_DOCKER_REPO ?= ghcr.io/scclabs/forgeai
+KO_DOCKER_REPO ?= ghcr.io/wutz/forgeai
 KO_PLATFORMS ?= linux/amd64
 
 .PHONY: render-dev

@@ -1,4 +1,4 @@
-apiVersion: forgeai.scclabs.dev/v1alpha1
+apiVersion: forgeai.wutz.dev/v1alpha1
 kind: Project
 metadata:
   name: demo

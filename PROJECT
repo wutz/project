@@ -3,36 +3,36 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.16.0
-domain: scclabs.dev
+domain: wutz.dev
 layout:
 - go.kubebuilder.io/v4
 projectName: forgeai
-repo: github.com/scclabs/forgeai
+repo: github.com/wutz/forgeai
 resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: scclabs.dev
+  domain: wutz.dev
   group: forgeai
   kind: Project
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
-  domain: scclabs.dev
+  domain: wutz.dev
   group: forgeai
   kind: InstanceType
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: scclabs.dev
+  domain: wutz.dev
   group: forgeai
   kind: FileServer
-  path: github.com/scclabs/forgeai/api/v1alpha1
+  path: github.com/wutz/forgeai/api/v1alpha1
   version: v1alpha1
 - controller: true
   core: true

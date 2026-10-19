@@ -38,10 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	forgeaiv1alpha1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/harbor"
-	"github.com/scclabs/forgeai/pkg/harbor/harbortest"
-	"github.com/scclabs/forgeai/pkg/platform"
+	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/harbor"
+	"github.com/wutz/forgeai/pkg/harbor/harbortest"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

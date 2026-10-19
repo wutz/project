@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: projects.forgeai.scclabs.dev
+  name: projects.forgeai.wutz.dev
 spec:
-  group: forgeai.scclabs.dev
+  group: forgeai.wutz.dev
   names:
     categories:
     - forgeai

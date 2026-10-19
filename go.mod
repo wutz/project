@@ -1,4 +1,4 @@
-module github.com/scclabs/forgeai
+module github.com/wutz/forgeai
 
 go 1.26.0
 

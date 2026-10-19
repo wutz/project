@@ -43,7 +43,7 @@ const (
 	LabelCompletion  = "batch.kubernetes.io/job-completion-index"
 
 	// PatchManager identifies forgeai's entry in TrainJob runtimePatches.
-	PatchManager = "forgeai.scclabs.dev/forgeai"
+	PatchManager = "forgeai.wutz.dev/forgeai"
 
 	ConditionComplete  = "Complete"
 	ConditionFailed    = "Failed"

@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/scclabs/forgeai/test/utils"
+	"github.com/wutz/forgeai/test/utils"
 )
 
 var (
