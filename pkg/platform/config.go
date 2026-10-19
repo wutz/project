@@ -299,7 +299,7 @@ func Parse(data []byte) (*Config, error) {
 		c.Sandbox.Namespace = DefaultSandboxNamespace
 	}
 	if c.Sandbox.DefaultImage == "" {
-		c.Sandbox.DefaultImage = "ghcr.io/kubernetes-sigs/agent-sandbox/python-runtime-sandbox:latest"
+		c.Sandbox.DefaultImage = "registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.1.0"
 	}
 	if c.Sandbox.DefaultRuntimeClass == "" && len(c.Sandbox.RuntimeClasses) > 0 {
 		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
