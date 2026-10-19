@@ -49,6 +49,7 @@ import (
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/sandbox"
 )
 
 const (
@@ -58,6 +59,7 @@ const (
 	keyNominalQuota  = "nominalQuota"
 	verbGet          = "get"
 	verbWatch        = "watch"
+	verbList         = "list"
 )
 
 // ProjectReconciler turns a Project into a labelled namespace with quota,
@@ -90,6 +92,9 @@ type ProjectReconciler struct {
 // +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads,verbs=get;list;watch
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=fileservers,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes/status,verbs=get
+// +kubebuilder:rbac:groups=extensions.agents.x-k8s.io,resources=sandboxtemplates;sandboxclaims;sandboxwarmpools,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
 
 func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -358,11 +363,16 @@ func networkPolicy(p *v1.Project, cfg *platform.Config, ns string) *networkingv1
 	if p.Spec.Network.Isolation == v1.NetworkNone {
 		return nil
 	}
+	// The agent-sandbox controller runs outside the project and talks to the
+	// sandbox API server on the pod IP and to its port-forward (kubectl,
+	// port 80 of the pod IP) inside the sandbox.
+	agents := nsPeer(cfg.Sandbox.NamespaceOrDefault())
 	same := networkingv1.NetworkPolicyPeer{PodSelector: &metav1.LabelSelector{}}
 	from := []networkingv1.NetworkPolicyPeer{same}
 	for _, n := range cfg.Network.SystemNamespaces {
 		from = append(from, nsPeer(n))
 	}
+	from = append(from, agents)
 	np := &networkingv1.NetworkPolicy{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "networking.k8s.io/v1", Kind: "NetworkPolicy"},
 		ObjectMeta: metav1.ObjectMeta{Name: naming.NetworkPolicyName, Namespace: ns, Labels: projectLabels(p)},
@@ -377,7 +387,7 @@ func networkPolicy(p *v1.Project, cfg *platform.Config, ns string) *networkingv1
 		dns := intstr.FromInt32(53)
 		np.Spec.PolicyTypes = append(np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 		np.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{
-			{To: []networkingv1.NetworkPolicyPeer{same}},
+			{To: []networkingv1.NetworkPolicyPeer{same, agents}},
 			{
 				To:    []networkingv1.NetworkPolicyPeer{nsPeer(cfg.Network.DNSNamespace)},
 				Ports: []networkingv1.NetworkPolicyPort{{Protocol: &udp, Port: &dns}, {Protocol: &tcp, Port: &dns}},
@@ -523,8 +533,9 @@ func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project,
 			{APIGroups: []string{v1.GroupVersion.Group}, Resources: []string{"projects"}, ResourceNames: []string{p.Name}, Verbs: []string{verbGet, verbWatch}},
 			{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{ns}, Verbs: []string{verbGet}},
 			{APIGroups: []string{"kueue.x-k8s.io"}, Resources: []string{"clusterqueues"}, ResourceNames: []string{naming.ClusterQueue(ns)}, Verbs: []string{verbGet, verbWatch}},
-			{APIGroups: []string{v1.GroupVersion.Group}, Resources: []string{"instancetypes"}, Verbs: []string{verbGet, "list", verbWatch}},
-			{APIGroups: []string{kf.Group}, Resources: []string{"clustertrainingruntimes"}, Verbs: []string{verbGet, "list", verbWatch}},
+			{APIGroups: []string{v1.GroupVersion.Group}, Resources: []string{"instancetypes"}, Verbs: []string{verbGet, verbList, verbWatch}},
+			{APIGroups: []string{kf.Group}, Resources: []string{"clustertrainingruntimes"}, Verbs: []string{verbGet, verbList, verbWatch}},
+			{APIGroups: []string{sandbox.Group}, Resources: []string{"sandboxes"}, Verbs: []string{verbGet, verbList, verbWatch}},
 			{APIGroups: []string{"authorization.k8s.io"}, Resources: []string{"selfsubjectaccessreviews", "selfsubjectrulesreviews"}, Verbs: []string{"create"}},
 		},
 	}); err != nil {
@@ -664,12 +675,23 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(cq, byProjectLabel, managed).
 		// Quotas follow the GPU classes and their slices.
 		Watches(&v1.InstanceType{}, allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		// Agent sandboxes carry the project label, so a new one is a new
+		// member of the project (nothing to reconcile yet, but the watch
+		// documents ownership and keeps quotas in sync on changes).
+		Watches(projectSandboxObject(), byProjectLabel, managed).
 		// Project namespaces carry a copy of the platform config.
 		Watches(&corev1.ConfigMap{}, allProjects, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			return o.GetNamespace() == r.Config.Namespace && o.GetName() == platform.ConfigMapName
 		}))).
 		Named("project").
 		Complete(r)
+}
+
+// projectSandboxObject is an empty Sandbox for the project controller's watch.
+func projectSandboxObject() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(sandbox.SandboxGVK)
+	return u
 }
 
 // statusPatch patches Project status with optimistic locking: the project

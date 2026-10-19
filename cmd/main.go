@@ -234,6 +234,7 @@ func main() {
 		"trainjob": &controller.TrainJobReconciler{
 			Client: mgr.GetClient(), Config: cfg, Recorder: mgr.GetEventRecorder("forgeai-trainjob"),
 		},
+		"sandbox": &controller.SandboxReconciler{Client: mgr.GetClient(), Config: cfg},
 	} {
 		if err := r.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "Failed to create controller", "controller", name)

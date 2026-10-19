@@ -65,6 +65,8 @@ defaultQuota:
   storage: 1Ti
 network:
   systemNamespaces: [ingress-nginx]
+sandbox:
+  idleTimeout: 1h
 training:
   stuckTimeout: 1s
 trashRetention: 1h
@@ -157,6 +159,7 @@ var _ = BeforeSuite(func() {
 		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
+		&SandboxReconciler{Client: mgr.GetClient(), Config: loader},
 	} {
 		Expect(r.SetupWithManager(mgr)).To(Succeed())
 	}

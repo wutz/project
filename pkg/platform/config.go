@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -147,6 +148,50 @@ type Training struct {
 	MaxRetries int32 `json:"maxRetries,omitempty"`
 }
 
+// Sandbox configures the agent sandboxes (agents.x-k8s.io Sandboxes): the
+// images offered, the isolation runtime classes and the idle policy.
+type Sandbox struct {
+	// DefaultImage runs a sandbox whose form names none.
+	DefaultImage string `json:"defaultImage,omitempty"`
+	// Images are the images offered in the GUI (others can be typed in).
+	Images []string `json:"images,omitempty"`
+	// RuntimeClasses are the isolation runtime classes offered (gvisor,
+	// kata); DefaultRuntimeClass is preselected. The RuntimeClass objects
+	// must be installed by the platform.
+	RuntimeClasses      []string `json:"runtimeClasses,omitempty"`
+	DefaultRuntimeClass string   `json:"defaultRuntimeClass,omitempty"`
+	// ShmSize is the /dev/shm emptyDir of a sandbox.
+	ShmSize resource.Quantity `json:"shmSize"`
+	// IdleTimeout suspends a running sandbox that nothing used for this
+	// long; 0 disables it.
+	IdleTimeout metav1.Duration `json:"idleTimeout,omitzero"`
+	// MaxTTL caps the auto-stop a user may ask for; 0 means unlimited.
+	MaxTTL metav1.Duration `json:"maxTTL,omitzero"`
+	// Namespace runs the agent-sandbox controller; project network policies
+	// let it reach the sandbox pods.
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// DefaultSandboxNamespace is where agent-sandbox is installed.
+const DefaultSandboxNamespace = "agent-sandbox-system"
+
+// NamespaceOrDefault is the agent-sandbox namespace.
+func (s Sandbox) NamespaceOrDefault() string {
+	if s.Namespace != "" {
+		return s.Namespace
+	}
+	return DefaultSandboxNamespace
+}
+
+// HasRuntimeClass reports whether a runtime class is offered (or none is
+// configured, in which case anything the cluster has is accepted).
+func (s Sandbox) HasRuntimeClass(name string) bool {
+	if len(s.RuntimeClasses) == 0 {
+		return true
+	}
+	return slices.Contains(s.RuntimeClasses, name)
+}
+
 type Config struct {
 	// NamespacePrefix is prepended to project names.
 	NamespacePrefix string `json:"namespacePrefix,omitempty"`
@@ -168,6 +213,7 @@ type Config struct {
 	Network       Network       `json:"network"`
 	FileServer    FileServer    `json:"fileServer"`
 	Training      Training      `json:"training"`
+	Sandbox       Sandbox       `json:"sandbox"`
 
 	// TrashRetention is the default retention of deleted volumes.
 	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
@@ -249,6 +295,16 @@ func Parse(data []byte) (*Config, error) {
 	}
 	defaultQuantity(&c.Training.ShmSize, "16Gi")
 	defaultDuration(&c.Training.StuckTimeout, 15*time.Minute)
+	if c.Sandbox.Namespace == "" {
+		c.Sandbox.Namespace = DefaultSandboxNamespace
+	}
+	if c.Sandbox.DefaultImage == "" {
+		c.Sandbox.DefaultImage = "ghcr.io/kubernetes-sigs/agent-sandbox/python-runtime-sandbox:latest"
+	}
+	if c.Sandbox.DefaultRuntimeClass == "" && len(c.Sandbox.RuntimeClasses) > 0 {
+		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
+	}
+	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
 	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }
