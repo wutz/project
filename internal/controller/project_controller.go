@@ -74,6 +74,7 @@ type ProjectReconciler struct {
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts;secrets;resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=clusterqueues;localqueues,verbs=get;list;watch;create;update;patch;delete
@@ -185,7 +186,11 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 	if err != nil {
 		return err
 	}
-	objs := []client.Object{resourceQuota(p, cfg, ns, classes), limitRange(p, ns), localQueue(p, ns)}
+	platformConfig, err := r.platformConfig(ctx, p, ns)
+	if err != nil {
+		return err
+	}
+	objs := []client.Object{platformConfig, resourceQuota(p, cfg, ns, classes), limitRange(p, ns), localQueue(p, ns)}
 	if np := networkPolicy(p, cfg, ns); np != nil {
 		objs = append(objs, np)
 	}
@@ -226,6 +231,23 @@ func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, 
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: labels},
 	})
+}
+
+// platformConfig mirrors the platform ConfigMap into the project namespace:
+// members read it there (storage types, registry, training defaults) and
+// have no access to the platform namespace. It is read uncached so a change
+// is copied by the reconcile it triggers.
+func (r *ProjectReconciler) platformConfig(ctx context.Context, p *v1.Project, ns string) (*corev1.ConfigMap, error) {
+	src := &corev1.ConfigMap{}
+	key := types.NamespacedName{Namespace: r.Config.Namespace, Name: platform.ConfigMapName}
+	if err := r.APIReader.Get(ctx, key, src); err != nil {
+		return nil, fmt.Errorf("get platform config: %w", err)
+	}
+	return &corev1.ConfigMap{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: ns, Labels: projectLabels(p)},
+		Data:       map[string]string{platform.ConfigKey: src.Data[platform.ConfigKey]},
+	}, nil
 }
 
 // gpuClasses returns the GPU classes and their per-GPU slice from the InstanceTypes.
@@ -642,6 +664,10 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(cq, byProjectLabel, managed).
 		// Quotas follow the GPU classes and their slices.
 		Watches(&v1.InstanceType{}, allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		// Project namespaces carry a copy of the platform config.
+		Watches(&corev1.ConfigMap{}, allProjects, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
+			return o.GetNamespace() == r.Config.Namespace && o.GetName() == platform.ConfigMapName
+		}))).
 		Named("project").
 		Complete(r)
 }

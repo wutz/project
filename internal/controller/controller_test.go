@@ -138,6 +138,11 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		// 2 GPUs x 15 cores + 4 cores headroom.
 		Expect(cpu.String()).To(Equal("34"))
 
+		// Members read the platform config from their namespace.
+		pc := &corev1.ConfigMap{}
+		Expect(get(pc, ns, platform.ConfigMapName)()).To(Succeed())
+		Expect(pc.Data).To(HaveKeyWithValue(platform.ConfigKey, testPlatformConfig))
+
 		np := &networkingv1.NetworkPolicy{}
 		Expect(get(np, ns, naming.NetworkPolicyName)()).To(Succeed())
 		Expect(np.Spec.PolicyTypes).To(ConsistOf(networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress))
@@ -188,6 +193,24 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Eventually(func() bool {
 			return apierrors.IsNotFound(get(&networkingv1.NetworkPolicy{}, ns, naming.NetworkPolicyName)())
 		}, timeout, interval).Should(BeTrue())
+	})
+
+	It("copies platform config changes into project namespaces", func() {
+		src := &corev1.ConfigMap{}
+		Expect(get(src, configNamespace, platform.ConfigMapName)()).To(Succeed())
+		changed := testPlatformConfig + "# edited\n"
+		src.Data[platform.ConfigKey] = changed
+		Expect(k8sClient.Update(ctx, src)).To(Succeed())
+		DeferCleanup(func() {
+			Expect(get(src, configNamespace, platform.ConfigMapName)()).To(Succeed())
+			src.Data[platform.ConfigKey] = testPlatformConfig
+			Expect(k8sClient.Update(ctx, src)).To(Succeed())
+		})
+		Eventually(func() string {
+			pc := &corev1.ConfigMap{}
+			_ = get(pc, ns, platform.ConfigMapName)()
+			return pc.Data[platform.ConfigKey]
+		}, timeout, interval).Should(Equal(changed))
 	})
 
 	It("refuses to adopt a foreign namespace", func() {
