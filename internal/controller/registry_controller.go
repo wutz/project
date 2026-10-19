@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	registryFinalizer = "forgeai.scclabs.dev/registry"
+	registryFinalizer = "forgeai.wutz.dev/registry"
 	// Keys of the registry Secret besides .dockerconfigjson.
 	RegistryKeyUsername = "username"
 	RegistryKeyPassword = "password"
@@ -64,8 +64,8 @@ type RegistryReconciler struct {
 	NewHarbor       HarborFactory
 }
 
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=projects,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 func (r *RegistryReconciler) harbor(ctx context.Context, cfg *platform.Config) (*harbor.Client, error) {

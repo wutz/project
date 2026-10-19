@@ -34,7 +34,7 @@ rules:
 - apiGroups: [kueue.x-k8s.io]
   resources: [localqueues, workloads]
   verbs: [get, list, watch]
-- apiGroups: [forgeai.scclabs.dev]
+- apiGroups: [forgeai.wutz.dev]
   resources: [fileservers]
   verbs: [get, list, watch, create, update, patch]
 ---
@@ -58,6 +58,6 @@ rules:
 - apiGroups: [kueue.x-k8s.io]
   resources: [localqueues, workloads]
   verbs: [get, list, watch]
-- apiGroups: [forgeai.scclabs.dev]
+- apiGroups: [forgeai.wutz.dev]
   resources: [fileservers]
   verbs: [get, list, watch]

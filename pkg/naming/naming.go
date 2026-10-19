@@ -15,45 +15,45 @@ const (
 
 	// LabelProject is set on project namespaces and every object forgeai
 	// creates for a project (value = Project name).
-	LabelProject = "forgeai.scclabs.dev/project"
+	LabelProject = "forgeai.wutz.dev/project"
 	// LabelMember is set on member ServiceAccounts and token Secrets.
-	LabelMember = "forgeai.scclabs.dev/member"
+	LabelMember = "forgeai.wutz.dev/member"
 
 	// LabelTrash marks a volume (PVC) in the trash.
-	LabelTrash = "forgeai.scclabs.dev/trash"
+	LabelTrash = "forgeai.wutz.dev/trash"
 	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
-	AnnotationTrashedAt = "forgeai.scclabs.dev/trashed-at"
+	AnnotationTrashedAt = "forgeai.wutz.dev/trashed-at"
 	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).
-	AnnotationExpireAt = "forgeai.scclabs.dev/expire-at"
+	AnnotationExpireAt = "forgeai.wutz.dev/expire-at"
 	// LabelVolumeType is the platform storage type of a volume.
-	LabelVolumeType = "forgeai.scclabs.dev/volume-type"
+	LabelVolumeType = "forgeai.wutz.dev/volume-type"
 
 	// AnnotationLastActive is a client heartbeat on a FileServer (RFC3339).
-	AnnotationLastActive = "forgeai.scclabs.dev/last-active"
+	AnnotationLastActive = "forgeai.wutz.dev/last-active"
 
 	// LabelTemplate marks a TrainingRuntime as a user job template.
-	LabelTemplate = "forgeai.scclabs.dev/template"
+	LabelTemplate = "forgeai.wutz.dev/template"
 	// AnnotationDescription describes a template.
-	AnnotationDescription = "forgeai.scclabs.dev/description"
+	AnnotationDescription = "forgeai.wutz.dev/description"
 	// LabelInstanceType is the InstanceType of a TrainJob.
-	LabelInstanceType = "forgeai.scclabs.dev/instance-type"
+	LabelInstanceType = "forgeai.wutz.dev/instance-type"
 	// LabelJobGroup groups a TrainJob with its retries (value = first job name).
-	LabelJobGroup = "forgeai.scclabs.dev/job-group"
+	LabelJobGroup = "forgeai.wutz.dev/job-group"
 	// AnnotationMaxRetries is how often a failed TrainJob is resubmitted.
-	AnnotationMaxRetries = "forgeai.scclabs.dev/max-retries"
+	AnnotationMaxRetries = "forgeai.wutz.dev/max-retries"
 	// AnnotationRetryOn is Infra (default) or Any.
-	AnnotationRetryOn = "forgeai.scclabs.dev/retry-on"
+	AnnotationRetryOn = "forgeai.wutz.dev/retry-on"
 	// AnnotationRetry is the attempt number of a resubmitted TrainJob.
-	AnnotationRetry = "forgeai.scclabs.dev/retry"
+	AnnotationRetry = "forgeai.wutz.dev/retry"
 	// AnnotationFailureReason is the failure classification of a TrainJob.
-	AnnotationFailureReason = "forgeai.scclabs.dev/failure-reason"
+	AnnotationFailureReason = "forgeai.wutz.dev/failure-reason"
 	// AnnotationFailureMessage details the failure.
-	AnnotationFailureMessage = "forgeai.scclabs.dev/failure-message"
+	AnnotationFailureMessage = "forgeai.wutz.dev/failure-message"
 	// AnnotationRetriedAs is the name of the TrainJob that retried this one.
-	AnnotationRetriedAs = "forgeai.scclabs.dev/retried-as"
+	AnnotationRetriedAs = "forgeai.wutz.dev/retried-as"
 
 	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
-	LabelGPUClass = "forgeai.scclabs.dev/gpu-class"
+	LabelGPUClass = "forgeai.wutz.dev/gpu-class"
 
 	// Node labels from NVIDIA GPU feature discovery.
 	LabelGPUProduct = "nvidia.com/gpu.product"

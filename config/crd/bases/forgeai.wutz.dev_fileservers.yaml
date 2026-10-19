@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: fileservers.forgeai.scclabs.dev
+  name: fileservers.forgeai.wutz.dev
 spec:
-  group: forgeai.scclabs.dev
+  group: forgeai.wutz.dev
   names:
     categories:
     - forgeai
@@ -33,7 +33,7 @@ spec:
       openAPIV3Schema:
         description: |-
           FileServer is an on-demand file transfer service (dufs) for the volumes of
-          a project. Clients wake it by updating the forgeai.scclabs.dev/last-active
+          a project. Clients wake it by updating the forgeai.wutz.dev/last-active
           annotation; it scales to zero after idleTimeout.
         properties:
           apiVersion:

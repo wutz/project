@@ -72,7 +72,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - forgeai.scclabs.dev
+  - forgeai.wutz.dev
   resources:
   - fileservers
   - instancetypes
@@ -86,14 +86,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - forgeai.scclabs.dev
+  - forgeai.wutz.dev
   resources:
   - fileservers/finalizers
   - projects/finalizers
   verbs:
   - update
 - apiGroups:
-  - forgeai.scclabs.dev
+  - forgeai.wutz.dev
   resources:
   - fileservers/status
   - instancetypes/status
