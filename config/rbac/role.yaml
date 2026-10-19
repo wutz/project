@@ -55,6 +55,24 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - agents.x-k8s.io
+  resources:
+  - sandboxes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - agents.x-k8s.io
+  resources:
+  - sandboxes/status
+  verbs:
+  - get
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -80,6 +98,20 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - extensions.agents.x-k8s.io
+  resources:
+  - sandboxclaims
+  - sandboxtemplates
+  - sandboxwarmpools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - forgeai.wutz.dev

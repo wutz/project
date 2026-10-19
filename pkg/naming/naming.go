@@ -30,6 +30,10 @@ const (
 
 	// AnnotationLastActive is a client heartbeat on a FileServer (RFC3339).
 	AnnotationLastActive = "forgeai.wutz.dev/last-active"
+	// AnnotationStopped marks a TrainJob or Sandbox the user stopped.
+	AnnotationStopped = "forgeai.wutz.dev/stopped"
+	// AnnotationIdleSince is when the operator suspended an idle Sandbox.
+	AnnotationIdleSince = "forgeai.wutz.dev/idle-since"
 
 	// LabelTemplate marks a TrainingRuntime as a user job template.
 	LabelTemplate = "forgeai.wutz.dev/template"
@@ -61,6 +65,7 @@ const (
 	LabelGPUMemory  = "nvidia.com/gpu.memory"
 
 	ComponentFileServer = "fileserver"
+	ComponentSandbox    = "sandbox"
 )
 
 // Fixed names inside a project namespace.
