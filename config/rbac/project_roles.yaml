@@ -15,6 +15,10 @@ rules:
 - apiGroups: [""]
   resources: [pods, pods/log, events, resourcequotas, limitranges, serviceaccounts, configmaps]
   verbs: [get, list, watch]
+# Shells in the agent sandboxes the GUI opens (view members get none).
+- apiGroups: [""]
+  resources: [pods/exec]
+  verbs: [create]
 - apiGroups: [""]
   # Registry robot and file server credentials.
   resources: [secrets]
