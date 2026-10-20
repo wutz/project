@@ -69,6 +69,9 @@ type Form struct {
 	Service bool `json:"service,omitempty"`
 	// Volumes mounts project volumes.
 	Volumes []VolumeMount `json:"volumes,omitempty"`
+	// Template names the SandboxTemplate the GUI prefilled the form from; it
+	// is recorded as a label and does not change the rendered pod.
+	Template string `json:"template,omitempty"`
 	// TTL is how long the sandbox lives before the controller stops it
 	// (empty or 0: it runs until suspended or deleted).
 	TTL metav1.Duration `json:"ttl,omitzero"`
@@ -148,6 +151,14 @@ func command(script string) []string {
 		return nil
 	}
 	return []string{"/bin/bash", "-c", script}
+}
+
+// scriptOf is the inverse of command: the script a container runs.
+func scriptOf(cmd []string) string {
+	if len(cmd) >= 3 && cmd[0] == "/bin/bash" && cmd[1] == "-c" {
+		return strings.Join(cmd[2:], " ")
+	}
+	return strings.Join(cmd, " ")
 }
 
 func env(in []EnvVar) []corev1.EnvVar {
@@ -264,6 +275,9 @@ func Render(f *Form, c Context) (*unstructured.Unstructured, error) {
 	if f.InstanceType != "" {
 		labels[naming.LabelInstanceType] = f.InstanceType
 	}
+	if f.Template != "" {
+		labels[LabelTemplateRef] = f.Template
+	}
 	sb := &Sandbox{
 		Spec: SandboxSpec{
 			OperatingMode: OperatingRunning,
@@ -314,11 +328,7 @@ func FormOf(sb *Sandbox) *Form {
 			continue
 		}
 		f.Image = ctr.Image
-		if len(ctr.Command) >= 3 && ctr.Command[0] == "/bin/bash" && ctr.Command[1] == "-c" {
-			f.Command = strings.Join(ctr.Command[2:], " ")
-		} else {
-			f.Command = strings.Join(ctr.Command, " ")
-		}
+		f.Command = scriptOf(ctr.Command)
 		for _, e := range ctr.Env {
 			f.Env = append(f.Env, EnvVar{Name: e.Name, Value: e.Value})
 		}
