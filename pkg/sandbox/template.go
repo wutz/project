@@ -113,7 +113,7 @@ func TemplateFormOf(t *SandboxTemplate) *TemplateForm {
 			continue
 		}
 		f.Image = ctr.Image
-		f.Command = scriptOf(ctr.Command)
+		f.Command = ScriptOf(ctr.Command)
 		for _, e := range ctr.Env {
 			f.Env = append(f.Env, EnvVar{Name: e.Name, Value: e.Value})
 		}

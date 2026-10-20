@@ -59,3 +59,14 @@ func TestRenderRecordsTemplateRef(t *testing.T) {
 		t.Errorf("template label = %q", got)
 	}
 }
+
+func TestScriptOfInvertsCommand(t *testing.T) {
+	for _, script := range []string{"python agent.py", "set -e\npython agent.py --once"} {
+		if got := ScriptOf(command(script)); got != script {
+			t.Errorf("ScriptOf(command(%q)) = %q", script, got)
+		}
+	}
+	if got := ScriptOf([]string{"/bin/agent", "--flag"}); got != "/bin/agent --flag" {
+		t.Errorf("ScriptOf of a plain argv = %q", got)
+	}
+}

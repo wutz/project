@@ -153,8 +153,8 @@ func command(script string) []string {
 	return []string{"/bin/bash", "-c", script}
 }
 
-// scriptOf is the inverse of command: the script a container runs.
-func scriptOf(cmd []string) string {
+// ScriptOf is the inverse of command: the script a container runs.
+func ScriptOf(cmd []string) string {
 	if len(cmd) >= 3 && cmd[0] == "/bin/bash" && cmd[1] == "-c" {
 		return strings.Join(cmd[2:], " ")
 	}
@@ -328,7 +328,7 @@ func FormOf(sb *Sandbox) *Form {
 			continue
 		}
 		f.Image = ctr.Image
-		f.Command = scriptOf(ctr.Command)
+		f.Command = ScriptOf(ctr.Command)
 		for _, e := range ctr.Env {
 			f.Env = append(f.Env, EnvVar{Name: e.Name, Value: e.Value})
 		}
