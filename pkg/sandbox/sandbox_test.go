@@ -171,6 +171,8 @@ func TestValidate(t *testing.T) {
 		"bad volume":   {Name: "agent", Image: "img", Volumes: []VolumeMount{{Volume: "data", MountPath: "data"}}},
 		"dup mount":    {Name: "agent", Image: "img", Volumes: []VolumeMount{{Volume: "a", MountPath: "/d"}, {Volume: "b", MountPath: "/d"}}},
 		"negative ttl": {Name: "agent", Image: "img", TTL: metav1.Duration{Duration: -time.Minute}},
+		"negative idle": {Name: "agent", Image: "img",
+			IdleTimeout: &metav1.Duration{Duration: -time.Minute}},
 	}
 	for name, f := range cases {
 		if err := f.Validate(); err == nil {
@@ -204,6 +206,87 @@ func TestFormUnmarshalTTL(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"ttl":{"Duration":"nope"}}`), &Form{}); err == nil {
 		t.Error("expected an error for a non-numeric duration")
 	}
+}
+
+func TestFormUnmarshalIdleTimeout(t *testing.T) {
+	cases := map[string]struct {
+		data string
+		want *time.Duration // nil: not set, so the platform default applies
+	}{
+		"duration string": {`{"name":"agent","image":"img","idleTimeout":"45m0s"}`, new(45 * time.Minute)},
+		"gui model object": {`{"name":"agent","image":"img","idleTimeout":{"Duration":2700000000000}}`,
+			new(45 * time.Minute)},
+		// Zero is an explicit "off" for this sandbox, not "unset".
+		"gui model zero": {`{"name":"agent","image":"img","idleTimeout":{"Duration":0}}`, new(time.Duration(0))},
+		"absent":         {`{"name":"agent","image":"img"}`, nil},
+	}
+	for name, c := range cases {
+		var f Form
+		if err := json.Unmarshal([]byte(c.data), &f); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		switch {
+		case c.want == nil && f.IdleTimeout != nil:
+			t.Errorf("%s: idleTimeout = %s, want unset", name, f.IdleTimeout.Duration)
+		case c.want != nil && (f.IdleTimeout == nil || f.IdleTimeout.Duration != *c.want):
+			t.Errorf("%s: idleTimeout = %+v, want %s", name, f.IdleTimeout, *c.want)
+		}
+		if f.Name != "agent" || f.Image != "img" {
+			t.Errorf("%s: lost plain fields: %+v", name, f)
+		}
+	}
+}
+
+func TestRenderIdleTimeout(t *testing.T) {
+	cfg := testConfig(t) // platform default 30m
+	render := func(f Form) *Sandbox {
+		u, err := Render(&f, Context{Namespace: "forge-demo", Platform: cfg})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return decode(t, u.Object)
+	}
+
+	// Unset: no annotation, so the platform default applies.
+	if sb := render(Form{Name: "agent"}); hasAnnotation(sb, naming.AnnotationIdleTimeout) {
+		t.Error("unset idleTimeout wrote an annotation")
+	}
+	if got := IdleTimeoutOf(render(Form{Name: "agent"}), 30*time.Minute); got != 30*time.Minute {
+		t.Errorf("unset: IdleTimeoutOf = %s, want the platform default", got)
+	}
+
+	// Set: the annotation overrides the platform default, both ways.
+	long := render(Form{Name: "agent", IdleTimeout: &metav1.Duration{Duration: 2 * time.Hour}})
+	if got := IdleTimeoutOf(long, 30*time.Minute); got != 2*time.Hour {
+		t.Errorf("2h: IdleTimeoutOf = %s", got)
+	}
+	off := render(Form{Name: "agent", IdleTimeout: &metav1.Duration{}})
+	if got := IdleTimeoutOf(off, 30*time.Minute); got != 0 {
+		t.Errorf("0: IdleTimeoutOf = %s, want 0 (off for this sandbox)", got)
+	}
+
+	// A malformed annotation falls back to the platform default.
+	bad := render(Form{Name: "agent"})
+	bad.Annotations = map[string]string{naming.AnnotationIdleTimeout: "soon"}
+	if got := IdleTimeoutOf(bad, 30*time.Minute); got != 30*time.Minute {
+		t.Errorf("malformed: IdleTimeoutOf = %s, want the platform default", got)
+	}
+
+	// The form round-trips, including an explicit 0.
+	if f := FormOf(off); f.IdleTimeout == nil || f.IdleTimeout.Duration != 0 {
+		t.Errorf("FormOf(off).IdleTimeout = %+v, want 0", f.IdleTimeout)
+	}
+	if f := FormOf(long); f.IdleTimeout == nil || f.IdleTimeout.Duration != 2*time.Hour {
+		t.Errorf("FormOf(long).IdleTimeout = %+v, want 2h", f.IdleTimeout)
+	}
+	if f := FormOf(render(Form{Name: "agent"})); f.IdleTimeout != nil {
+		t.Errorf("FormOf(unset).IdleTimeout = %+v, want nil", f.IdleTimeout)
+	}
+}
+
+func hasAnnotation(sb *Sandbox, key string) bool {
+	_, ok := sb.Annotations[key]
+	return ok
 }
 
 func TestRuntimeClassAllowList(t *testing.T) {

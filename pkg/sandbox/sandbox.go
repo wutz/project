@@ -75,6 +75,10 @@ type Form struct {
 	// TTL is how long the sandbox lives before the controller stops it
 	// (empty or 0: it runs until suspended or deleted).
 	TTL metav1.Duration `json:"ttl,omitzero"`
+	// IdleTimeout suspends the sandbox after this long without a client
+	// heartbeat. Nil uses the platform's sandbox.idleTimeout; 0 turns the idle
+	// policy off for this sandbox.
+	IdleTimeout *metav1.Duration `json:"idleTimeout,omitempty"`
 }
 
 var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
@@ -82,10 +86,10 @@ var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
 // nanos is a duration in nanoseconds, the shape of the GUI's duration model.
 type nanos int64
 
-// UnmarshalJSON accepts both encodings of the auto-stop duration that reach
-// this struct: a Go duration string ("1h0m0s"), which is what metav1.Duration
-// marshals to, and the {"Duration": <nanoseconds>} object the generated Wails
-// model sends from the GUI form.
+// UnmarshalJSON accepts both encodings of the durations that reach this struct:
+// a Go duration string ("1h0m0s"), which is what metav1.Duration marshals to,
+// and the {"Duration": <nanoseconds>} object the generated Wails model sends
+// from the GUI form.
 func (f *Form) UnmarshalJSON(data []byte) error {
 	type form Form // without methods, so this decoder does not recurse
 	var decoded form
@@ -93,13 +97,16 @@ func (f *Form) UnmarshalJSON(data []byte) error {
 		*f = Form(decoded)
 		return nil
 	}
-	// The duration arrives as an object: decode every field through form and
-	// take ttl from the object's Duration field.
+	// The durations arrive as objects: decode every field through form and
+	// take ttl and idleTimeout from the objects' Duration fields.
 	var model struct {
 		*form
 		TTL *struct {
 			Duration nanos `json:"Duration"`
 		} `json:"ttl"`
+		IdleTimeout *struct {
+			Duration nanos `json:"Duration"`
+		} `json:"idleTimeout"`
 	}
 	model.form = &decoded
 	if err := json.Unmarshal(data, &model); err != nil {
@@ -107,6 +114,9 @@ func (f *Form) UnmarshalJSON(data []byte) error {
 	}
 	if model.TTL != nil {
 		decoded.TTL = metav1.Duration{Duration: time.Duration(model.TTL.Duration)}
+	}
+	if model.IdleTimeout != nil {
+		decoded.IdleTimeout = &metav1.Duration{Duration: time.Duration(model.IdleTimeout.Duration)}
 	}
 	*f = Form(decoded)
 	return nil
@@ -130,6 +140,9 @@ func (f *Form) Validate() error {
 	}
 	if f.TTL.Duration < 0 {
 		return fmt.Errorf("ttl must not be negative")
+	}
+	if f.IdleTimeout != nil && f.IdleTimeout.Duration < 0 {
+		return fmt.Errorf("idleTimeout must not be negative")
 	}
 	return nil
 }
@@ -298,7 +311,24 @@ func Render(f *Form, c Context) (*unstructured.Unstructured, error) {
 	if f.TTL.Duration > 0 {
 		sb.Annotations[AnnotationTTL] = f.TTL.Duration.String()
 	}
+	if f.IdleTimeout != nil {
+		sb.Annotations[naming.AnnotationIdleTimeout] = f.IdleTimeout.Duration.String()
+	}
 	return ToUnstructured(sb)
+}
+
+// IdleTimeoutOf is the idle timeout of a sandbox: the one it was created with,
+// or the platform default when it has none (or the annotation is not a duration).
+func IdleTimeoutOf(sb *Sandbox, platformDefault time.Duration) time.Duration {
+	s, ok := sb.Annotations[naming.AnnotationIdleTimeout]
+	if !ok {
+		return platformDefault
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 0 {
+		return platformDefault
+	}
+	return d
 }
 
 // ToUnstructured converts a rendered sandbox into the create payload, dropping
@@ -346,6 +376,11 @@ func FormOf(sb *Sandbox) *Form {
 		f.TTL = metav1.Duration{Duration: time.Until(sb.Spec.ShutdownTime.Time).Round(time.Minute)}
 		if f.TTL.Duration < 0 {
 			f.TTL.Duration = 0
+		}
+	}
+	if s, ok := sb.Annotations[naming.AnnotationIdleTimeout]; ok {
+		if d, err := time.ParseDuration(s); err == nil {
+			f.IdleTimeout = &metav1.Duration{Duration: d}
 		}
 	}
 	return f

@@ -34,6 +34,9 @@ const (
 	AnnotationStopped = "forgeai.wutz.dev/stopped"
 	// AnnotationIdleSince is when the operator suspended an idle Sandbox.
 	AnnotationIdleSince = "forgeai.wutz.dev/idle-since"
+	// AnnotationIdleTimeout is the idle timeout a Sandbox was created with
+	// (Go duration); absent means the platform's sandbox.idleTimeout applies.
+	AnnotationIdleTimeout = "forgeai.wutz.dev/idle-timeout"
 
 	// LabelTemplate marks a TrainingRuntime as a user job template.
 	LabelTemplate = "forgeai.wutz.dev/template"
