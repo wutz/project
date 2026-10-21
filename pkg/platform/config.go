@@ -165,8 +165,6 @@ type Sandbox struct {
 	// IdleTimeout suspends a running sandbox that nothing used for this
 	// long; 0 disables it.
 	IdleTimeout metav1.Duration `json:"idleTimeout,omitzero"`
-	// MaxTTL caps the auto-stop a user may ask for; 0 means unlimited.
-	MaxTTL metav1.Duration `json:"maxTTL,omitzero"`
 	// Namespace runs the agent-sandbox controller; project network policies
 	// let it reach the sandbox pods.
 	Namespace string `json:"namespace,omitempty"`
