@@ -86,6 +86,17 @@ func (s *Server) RobotSecret(name string) string {
 	return ""
 }
 
+// RemoveRobot deletes a robot by login name, as if it was removed in Harbor.
+func (s *Server) RemoveRobot(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, rb := range s.Robots {
+		if rb.Name == name {
+			delete(s.Robots, id)
+		}
+	}
+}
+
 // HasProject reports whether a project exists.
 func (s *Server) HasProject(name string) bool {
 	s.mu.Lock()

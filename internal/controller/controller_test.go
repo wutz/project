@@ -178,6 +178,28 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		}, timeout, interval).Should(ContainElement(corev1.LocalObjectReference{Name: naming.RegistrySecretName}))
 	})
 
+	It("issues the robot again when Harbor lost it", func() {
+		reg := &corev1.Secret{}
+		Expect(get(reg, ns, naming.RegistrySecretName)()).To(Succeed())
+		login, oldSecret := string(reg.Data["username"]), string(reg.Data["password"])
+		fakeHarbor.RemoveRobot(login)
+
+		// A spec change makes the registry controller reconcile the project.
+		p := &v1.Project{}
+		Expect(get(p, "", project)()).To(Succeed())
+		p.Spec.Quota.RegistryStorage = resource.NewQuantity(10<<30, resource.BinarySI)
+		Expect(k8sClient.Update(ctx, p)).To(Succeed())
+
+		Eventually(func() bool {
+			cur := &corev1.Secret{}
+			if get(cur, ns, naming.RegistrySecretName)() != nil {
+				return false
+			}
+			newSecret := string(cur.Data["password"])
+			return newSecret != oldSecret && fakeHarbor.RobotSecret(login) == newSecret
+		}, timeout, interval).Should(BeTrue())
+	})
+
 	It("updates members and quota", func() {
 		p := &v1.Project{}
 		Expect(get(p, "", project)()).To(Succeed())

@@ -69,6 +69,36 @@ func TestProjectLifecycle(t *testing.T) {
 	}
 }
 
+func TestHasRobot(t *testing.T) {
+	ctx := context.Background()
+	srv := harbortest.New("admin", "pw")
+	defer srv.Close()
+	c := harbor.New(srv.URL, "admin", "pw", true)
+
+	p, err := c.EnsureProject(ctx, "forge-demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := c.HasRobot(ctx, p, harbor.RobotName); err != nil || ok {
+		t.Fatalf("robot before creation: %v %v", ok, err)
+	}
+	name, err := c.EnsureRobot(ctx, p, harbor.RobotName, "Secret1234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := c.HasRobot(ctx, p, harbor.RobotName); err != nil || !ok {
+		t.Fatalf("robot after creation: %v %v", ok, err)
+	}
+	// Removing the robot in Harbor is seen, and EnsureRobot issues it again.
+	srv.RemoveRobot(name)
+	if ok, err := c.HasRobot(ctx, p, harbor.RobotName); err != nil || ok {
+		t.Fatalf("robot after removal: %v %v", ok, err)
+	}
+	if _, err := c.EnsureRobot(ctx, p, harbor.RobotName, "Secret5678"); err != nil || srv.RobotSecret(name) != "Secret5678" {
+		t.Fatalf("reissue robot: %v", err)
+	}
+}
+
 func TestDockerConfigJSON(t *testing.T) {
 	b, err := harbor.DockerConfigJSON("cr.example.com:7443", "robot$p+forgeai", "s")
 	if err != nil {

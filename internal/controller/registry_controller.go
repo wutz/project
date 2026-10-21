@@ -167,7 +167,14 @@ func (r *RegistryReconciler) reconcile(ctx context.Context, p *v1.Project, cfg *
 		return err
 	}
 	username, password := string(cur.Data[RegistryKeyUsername]), string(cur.Data[RegistryKeyPassword])
-	if password == "" || string(cur.Data[RegistryKeyServer]) != cfg.Registry.Domain {
+	// Harbor can lose the robot while the Secret stays (the robot or the
+	// project was removed in Harbor), so the Secret alone does not prove the
+	// login works. A missing robot is issued again with a new secret.
+	exists, err := h.HasRobot(ctx, hp, harbor.RobotName)
+	if err != nil {
+		return err
+	}
+	if !exists || password == "" || string(cur.Data[RegistryKeyServer]) != cfg.Registry.Domain {
 		if password, err = harbor.GenerateSecret(); err != nil {
 			return err
 		}

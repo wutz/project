@@ -245,6 +245,19 @@ func (c *Client) findRobot(ctx context.Context, p *Project, name string) (*Robot
 	return nil, ErrNotFound
 }
 
+// HasRobot reports whether the project robot exists in Harbor.
+func (c *Client) HasRobot(ctx context.Context, p *Project, name string) (bool, error) {
+	_, err := c.findRobot(ctx, p, name)
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, ErrNotFound):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
 // EnsureRobot creates (or resets) the project robot with the given secret and
 // returns its login name. Harbor only reveals robot secrets on creation, so
 // the caller generates the secret and stores it.
