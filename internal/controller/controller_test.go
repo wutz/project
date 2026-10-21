@@ -315,6 +315,42 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		}, timeout, interval).Should(Equal(int32(1)))
 	})
 
+	It("releases a trashed volume from the file server", func() {
+		pcfg, err := platform.Parse([]byte(testPlatformConfig))
+		Expect(err).NotTo(HaveOccurred())
+		vc := &volumes.Client{K8s: k8sClient, Namespace: ns}
+		_, err = vc.Create(ctx, pcfg, "shared", "", 10)
+		Expect(err).NotTo(HaveOccurred())
+		dep := &appsv1.Deployment{}
+		name := "forgeai-files-default"
+		Eventually(func() string {
+			_ = get(dep, ns, name)()
+			return dep.Spec.Template.Annotations[annotationServedVolumes]
+		}, timeout, interval).Should(Equal("keep,shared"))
+
+		// A file server pod mounts the volume, as the deployment would once running.
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name + "-0", Namespace: ns, Labels: map[string]string{
+				naming.LabelComponent: naming.ComponentFileServer, labelInstance: name}},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: fileServerContainer, Image: "dufs"}},
+				Volumes: []corev1.Volume{{Name: "v-shared", VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "shared"}}}},
+			},
+		}
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+		pod.Status.Phase = corev1.PodRunning
+		Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
+
+		_, err = vc.Trash(ctx, "shared", time.Hour)
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(func() string {
+			_ = get(dep, ns, name)()
+			return dep.Spec.Template.Annotations[annotationServedVolumes]
+		}, timeout, interval).Should(Equal("keep"))
+		Expect(k8sClient.Delete(ctx, pod)).To(Succeed())
+	})
+
 	It("classifies a failed TrainJob and retries infrastructure failures", func() {
 		f := &training.Form{Name: "train", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1, MaxRetries: 1}
 		it := &v1.InstanceType{}
