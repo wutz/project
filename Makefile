@@ -204,6 +204,10 @@ gui: ## Build the Wails desktop client (gui/build/bin).
 gui-dev: ## Run the Wails dev server without breaking the packaged app (see hack/gui-dev.sh).
 	./hack/gui-dev.sh $(GUI_DEV_ARGS)
 
+.PHONY: gui-deps
+gui-deps: kustomize ## Regenerate the cluster dependency manifests embedded in the GUI (gui/app/deps).
+	KUSTOMIZE="$(KUSTOMIZE)" ./hack/gui-deps.sh
+
 ##@ Dependencies
 
 ## Location to install dependencies to
