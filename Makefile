@@ -290,3 +290,72 @@ endef
 define gomodver
 $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
 endef
+
+##@ Helm Deployment
+
+## Helm binary to use for deploying the chart
+HELM ?= helm
+## Namespace to deploy the Helm release
+HELM_NAMESPACE ?= forgeai-system
+## Name of the Helm release
+HELM_RELEASE ?= forgeai
+## Path to the Helm chart directory
+HELM_CHART_DIR ?= charts/chart
+## Additional arguments to pass to helm commands
+HELM_EXTRA_ARGS ?=
+
+.PHONY: install-helm
+install-helm: ## Install the latest version of Helm.
+	@command -v $(HELM) >/dev/null 2>&1 || { \
+		echo "Installing Helm..." && \
+		curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash; \
+	}
+
+.PHONY: helm-deploy
+helm-deploy: install-helm ## Deploy manager to the K8s cluster via Helm. Specify an image with IMG.
+	IMG="$(IMG)"; $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART_DIR) \
+		--namespace $(HELM_NAMESPACE) \
+		--create-namespace \
+		--set manager.image.repository=$${IMG%:*} \
+		--set manager.image.tag=$${IMG##*:} \
+		--wait \
+		--timeout 5m \
+		$(HELM_EXTRA_ARGS)
+
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall the Helm release from the K8s cluster.
+	$(HELM) uninstall $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-status
+helm-status: ## Show Helm release status.
+	$(HELM) status $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-history
+helm-history: ## Show Helm release history.
+	$(HELM) history $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-rollback
+helm-rollback: ## Rollback to previous Helm release.
+	$(HELM) rollback $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+## OCI registry the chart is published to; the chart lands at <HELM_OCI_REPO>/<chart name>.
+HELM_OCI_REPO ?= oci://ghcr.io/wutz/charts
+## Chart and app version of the package, set by the release workflow from the tag (e.g. 0.1.0).
+CHART_VERSION ?=
+
+.PHONY: helm-lint
+helm-lint: install-helm ## Lint the Helm chart and render it with the default values and a platform config.
+	$(HELM) lint $(HELM_CHART_DIR)
+	$(HELM) template forgeai $(HELM_CHART_DIR) --namespace $(HELM_NAMESPACE) >/dev/null
+	$(HELM) template forgeai $(HELM_CHART_DIR) --namespace $(HELM_NAMESPACE) --set platform.config.namespacePrefix=forge- >/dev/null
+
+.PHONY: helm-package
+helm-package: install-helm ## Package the Helm chart into dist/. CHART_VERSION sets the chart and app version.
+	mkdir -p dist
+	$(HELM) package $(HELM_CHART_DIR) --destination dist \
+		$(if $(CHART_VERSION),--version $(CHART_VERSION) --app-version $(CHART_VERSION))
+
+.PHONY: helm-push
+helm-push: install-helm ## Push dist/forgeai-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
+	@test -n "$(CHART_VERSION)" || { echo "CHART_VERSION is required"; exit 1; }
+	$(HELM) push dist/forgeai-$(CHART_VERSION).tgz $(HELM_OCI_REPO)

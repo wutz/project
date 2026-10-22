@@ -1,0 +1,17 @@
+apiVersion: v2
+name: forgeai
+description: The forgeai operator - projects, instance types and file servers for a Kubernetes-native AI platform
+home: https://github.com/wutz/forgeai
+sources:
+  - https://github.com/wutz/forgeai
+type: application
+
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - kubernetes
+  - operator
+
+annotations:
+  kubebuilder.io/generated-by: kubebuilder
