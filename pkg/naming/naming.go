@@ -56,6 +56,12 @@ const (
 	AnnotationFailureReason = "forgeai.wutz.dev/failure-reason"
 	// AnnotationFailureMessage details the failure.
 	AnnotationFailureMessage = "forgeai.wutz.dev/failure-message"
+	// AnnotationObservedFailureReason is the worker failure seen while the
+	// TrainJob ran. The Trainer removes its pods once the job fails, so this
+	// is the record of the cause when the failure is classified afterwards.
+	AnnotationObservedFailureReason = "forgeai.wutz.dev/observed-failure-reason"
+	// AnnotationObservedFailureMessage details the observed worker failure.
+	AnnotationObservedFailureMessage = "forgeai.wutz.dev/observed-failure-message"
 	// AnnotationRetriedAs is the name of the TrainJob that retried this one.
 	AnnotationRetriedAs = "forgeai.wutz.dev/retried-as"
 

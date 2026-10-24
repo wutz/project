@@ -70,6 +70,22 @@ func trainJob(ns, name string) *unstructured.Unstructured {
 	return u
 }
 
+// failTrainJob marks a TrainJob Failed as the Trainer does. The operator
+// annotates the same object while it runs, so a copy read earlier can conflict;
+// the update is retried on a fresh copy.
+func failTrainJob(ns, name string) {
+	Eventually(func() error {
+		u := trainJob(ns, name)
+		if err := unstructured.SetNestedSlice(u.Object, []any{map[string]any{
+			"type": "Failed", "status": "True", "reason": "FailedJobs", "message": "jobset failed",
+			"lastTransitionTime": time.Now().UTC().Format(time.RFC3339),
+		}}, "status", "conditions"); err != nil {
+			return err
+		}
+		return k8sClient.Status().Update(ctx, u)
+	}, timeout, interval).Should(Succeed())
+}
+
 var _ = Describe("forgeai operator", Ordered, func() {
 	const project = "demo"
 	ns := "forge-" + project
@@ -377,12 +393,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		}}}
 		Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
 
-		u = trainJob(ns, "train")
-		Expect(unstructured.SetNestedSlice(u.Object, []any{map[string]any{
-			"type": "Failed", "status": "True", "reason": "FailedJobs", "message": "jobset failed",
-			"lastTransitionTime": time.Now().UTC().Format(time.RFC3339),
-		}}, "status", "conditions")).To(Succeed())
-		Expect(k8sClient.Status().Update(ctx, u)).To(Succeed())
+		failTrainJob(ns, "train")
 
 		Eventually(func() map[string]string {
 			return trainJob(ns, "train").GetAnnotations()
@@ -430,6 +441,47 @@ var _ = Describe("forgeai operator", Ordered, func() {
 			return apierrors.IsNotFound(get(&unstructured.Unstructured{Object: map[string]any{
 				"apiVersion": kf.TrainJobGVK.GroupVersion().String(), "kind": "TrainJob"}}, ns, "stuck-r1")())
 		}, 2*time.Second, interval).Should(BeTrue())
+	})
+
+	It("keeps the worker failure seen while a TrainJob ran once its pods are gone", func() {
+		f := &training.Form{Name: "gone", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
+		it := &v1.InstanceType{}
+		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
+		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
+		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
+		Expect(err).NotTo(HaveOccurred())
+		m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tj)
+		Expect(err).NotTo(HaveOccurred())
+		u := &unstructured.Unstructured{Object: m}
+		unstructured.RemoveNestedField(u.Object, "metadata", "creationTimestamp")
+		Expect(k8sClient.Create(ctx, u)).To(Succeed())
+
+		// The worker runs out of memory while the job runs.
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "gone-node-0-0-x", Namespace: ns, Labels: map[string]string{
+				kf.LabelJobSetName: "gone", kf.LabelCompletion: "0",
+			}},
+			Spec: corev1.PodSpec{NodeName: "gn-1", Containers: []corev1.Container{{Name: "node", Image: "img"}}},
+		}
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+		pod.Status = corev1.PodStatus{Phase: corev1.PodFailed, ContainerStatuses: []corev1.ContainerStatus{{
+			Name: "node", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 137, Reason: "OOMKilled"}},
+		}}}
+		Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
+		Eventually(func() map[string]string {
+			return trainJob(ns, "gone").GetAnnotations()
+		}, timeout, interval).Should(HaveKeyWithValue(naming.AnnotationObservedFailureReason, training.ReasonOOMKilled))
+
+		// The Trainer removes the pod when it fails the job; nothing is left to classify.
+		Expect(k8sClient.Delete(ctx, pod, client.GracePeriodSeconds(0))).To(Succeed())
+		failTrainJob(ns, "gone")
+
+		Eventually(func() map[string]string {
+			return trainJob(ns, "gone").GetAnnotations()
+		}, timeout, interval).Should(And(
+			HaveKeyWithValue(naming.AnnotationFailureReason, training.ReasonOOMKilled),
+			HaveKeyWithValue(naming.AnnotationFailureMessage, "worker-0 ran out of memory"),
+		))
 	})
 
 	It("deletes the namespace and registry with deletionPolicy Delete", func() {

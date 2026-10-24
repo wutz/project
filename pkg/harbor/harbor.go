@@ -374,6 +374,13 @@ func (c *Client) DeleteArtifact(ctx context.Context, project, repo, reference st
 	return err
 }
 
+// DeleteTag removes one tag from an artifact. The artifact keeps its digest and
+// its other tags; without any tag left it stays in the repository, untagged.
+func (c *Client) DeleteTag(ctx context.Context, project, repo, reference, tag string) error {
+	return c.do(ctx, http.MethodDelete,
+		repoPath(project, repo)+"/artifacts/"+url.PathEscape(reference)+"/tags/"+url.PathEscape(tag), nil, nil, nil)
+}
+
 // DockerConfigJSON renders a .dockerconfigjson for one registry.
 func DockerConfigJSON(registry, username, password string) ([]byte, error) {
 	type entry struct {

@@ -173,6 +173,9 @@ func TestValidate(t *testing.T) {
 		"negative ttl": {Name: "agent", Image: "img", TTL: metav1.Duration{Duration: -time.Minute}},
 		"negative idle": {Name: "agent", Image: "img",
 			IdleTimeout: &metav1.Duration{Duration: -time.Minute}},
+		"ttl over a year": {Name: "agent", Image: "img", TTL: metav1.Duration{Duration: 366 * 24 * time.Hour}},
+		"idle over a year": {Name: "agent", Image: "img",
+			IdleTimeout: &metav1.Duration{Duration: 366 * 24 * time.Hour}},
 	}
 	for name, f := range cases {
 		if err := f.Validate(); err == nil {
@@ -329,6 +332,39 @@ func TestPhaseOf(t *testing.T) {
 	}
 }
 
+func TestPhaseReason(t *testing.T) {
+	ready := func(status metav1.ConditionStatus, reason string) *Sandbox {
+		return &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
+			{Type: ConditionReady, Status: status, Reason: reason, Message: "controller text"},
+		}}}
+	}
+	cases := []struct {
+		name string
+		sb   *Sandbox
+		want string
+	}{
+		{"no status yet", &Sandbox{}, ReasonAwaitingController},
+		{"no Ready condition, has an address", &Sandbox{Status: SandboxStatus{PodIPs: []string{"10.0.0.1"}}}, ""},
+		{"running", ready(metav1.ConditionTrue, ReasonDependenciesReady), ""},
+		{"pod failed", ready(metav1.ConditionFalse, ReasonPodFailed), ReasonPodFailed},
+		{"expired", ready(metav1.ConditionFalse, ReasonExpired), ReasonExpired},
+		{"suspended", ready(metav1.ConditionFalse, ReasonSuspended), ReasonSuspended},
+		{"suspended while Ready", &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
+			{Type: ConditionReady, Status: metav1.ConditionTrue, Reason: ReasonDependenciesReady},
+			{Type: ConditionSuspended, Status: metav1.ConditionTrue},
+		}}}, ReasonSuspended},
+	}
+	for _, c := range cases {
+		if got := PhaseReason(c.sb); got != c.want {
+			t.Errorf("%s: PhaseReason = %q, want %q", c.name, got, c.want)
+		}
+	}
+	// The controller's free-text message is not a reason, and PhaseOf keeps it.
+	if _, msg := PhaseOf(ready(metav1.ConditionFalse, ReasonPodFailed)); msg != "controller text" {
+		t.Errorf("PhaseOf message = %q, want the controller's text", msg)
+	}
+}
+
 func TestIdle(t *testing.T) {
 	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	sb := &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
@@ -348,5 +384,32 @@ func TestIdle(t *testing.T) {
 	stopped := &Sandbox{Spec: SandboxSpec{OperatingMode: OperatingSuspended}}
 	if idle, _ := Idle(stopped, pod, 30*time.Minute, now); idle {
 		t.Error("a stopped sandbox is not idle, it is already stopped")
+	}
+}
+
+func TestReopenElapsed(t *testing.T) {
+	now := time.Now()
+	past := metav1.NewTime(now.Add(-time.Hour))
+	future := metav1.NewTime(now.Add(time.Hour))
+	cases := map[string]struct {
+		shutdown *metav1.Time
+		cleared  bool
+	}{
+		"no shutdown": {nil, false},
+		"elapsed":     {&past, true},
+		"still ahead": {&future, false},
+	}
+	for name, c := range cases {
+		sb := &Sandbox{}
+		sb.Spec.ShutdownTime = c.shutdown
+		if got := ReopenElapsed(sb, now); got != c.cleared {
+			t.Errorf("%s: ReopenElapsed = %v, want %v", name, got, c.cleared)
+		}
+		if c.cleared && sb.Spec.ShutdownTime != nil {
+			t.Errorf("%s: shutdown time kept after reopen", name)
+		}
+		if !c.cleared && c.shutdown != nil && sb.Spec.ShutdownTime == nil {
+			t.Errorf("%s: shutdown time dropped while still ahead", name)
+		}
 	}
 }

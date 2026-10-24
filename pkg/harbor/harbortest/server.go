@@ -195,6 +195,27 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, nil)
 			return
 		}
+		if r.Method == http.MethodDelete && len(parts) == 8 && parts[6] == "tags" {
+			for i := range arts {
+				if arts[i].Digest != parts[5] {
+					continue
+				}
+				kept := []string{}
+				for _, t := range arts[i].Tags {
+					if t != parts[7] {
+						kept = append(kept, t)
+					}
+				}
+				if len(kept) == len(arts[i].Tags) {
+					break
+				}
+				arts[i].Tags = kept
+				writeJSON(w, http.StatusOK, nil)
+				return
+			}
+			writeJSON(w, http.StatusNotFound, nil)
+			return
+		}
 		if r.Method == http.MethodDelete && len(parts) == 6 {
 			kept := arts[:0]
 			for _, a := range arts {

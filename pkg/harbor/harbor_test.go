@@ -109,3 +109,33 @@ func TestDockerConfigJSON(t *testing.T) {
 		t.Fatalf("got %s", b)
 	}
 }
+
+func TestDeleteTag(t *testing.T) {
+	ctx := context.Background()
+	srv := harbortest.New("admin", "pw")
+	defer srv.Close()
+	c := harbor.New(srv.URL, "admin", "pw", true)
+	if _, err := c.EnsureProject(ctx, "forge-demo"); err != nil {
+		t.Fatal(err)
+	}
+	srv.AddArtifact("forge-demo", "team/train", "sha256:a", "v1", "latest")
+
+	if err := c.DeleteTag(ctx, "forge-demo", "team/train", "sha256:a", "latest"); err != nil {
+		t.Fatal(err)
+	}
+	arts, err := c.ListArtifacts(ctx, "forge-demo", "team/train")
+	if err != nil || len(arts) != 1 || len(arts[0].TagNames()) != 1 || arts[0].TagNames()[0] != "v1" {
+		t.Fatalf("after tag delete %+v %v", arts, err)
+	}
+	if err := c.DeleteTag(ctx, "forge-demo", "team/train", "sha256:a", "latest"); !errors.Is(err, harbor.ErrNotFound) {
+		t.Fatalf("deleting a missing tag: %v", err)
+	}
+	// The last tag goes, and the image stays in the repository, untagged.
+	if err := c.DeleteTag(ctx, "forge-demo", "team/train", "sha256:a", "v1"); err != nil {
+		t.Fatal(err)
+	}
+	arts, err = c.ListArtifacts(ctx, "forge-demo", "team/train")
+	if err != nil || len(arts) != 1 || len(arts[0].TagNames()) != 0 {
+		t.Fatalf("after last tag delete %+v %v", arts, err)
+	}
+}

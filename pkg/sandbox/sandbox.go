@@ -131,6 +131,13 @@ func (f *Form) Validate() error {
 	if strings.TrimSpace(f.Image) == "" {
 		return fmt.Errorf("image is required")
 	}
+	seen := map[string]bool{}
+	for _, e := range f.Env {
+		if e.Name == "" || seen[e.Name] {
+			return fmt.Errorf("environment variable names must be unique and non-empty")
+		}
+		seen[e.Name] = true
+	}
 	paths := map[string]bool{}
 	for _, m := range f.Volumes {
 		if m.Volume == "" || !strings.HasPrefix(m.MountPath, "/") || paths[m.MountPath] {
@@ -141,11 +148,20 @@ func (f *Form) Validate() error {
 	if f.TTL.Duration < 0 {
 		return fmt.Errorf("ttl must not be negative")
 	}
+	if f.TTL.Duration > maxDuration {
+		return fmt.Errorf("ttl must not exceed one year")
+	}
 	if f.IdleTimeout != nil && f.IdleTimeout.Duration < 0 {
 		return fmt.Errorf("idleTimeout must not be negative")
 	}
+	if f.IdleTimeout != nil && f.IdleTimeout.Duration > maxDuration {
+		return fmt.Errorf("idleTimeout must not exceed one year")
+	}
 	return nil
 }
+
+// maxDuration bounds the auto-stop and idle timeouts: the form offers no more than a year.
+const maxDuration = 365 * 24 * time.Hour
 
 // Context is what a sandbox needs beyond the form.
 type Context struct {
@@ -427,4 +443,15 @@ func GPU(sb *Sandbox) int64 {
 		}
 	}
 	return n
+}
+
+// ReopenElapsed clears a shutdown time that has already passed, so a sandbox that
+// expired can run again instead of expiring at once. A shutdown time still ahead
+// is kept. It reports whether it cleared one.
+func ReopenElapsed(sb *Sandbox, now time.Time) bool {
+	if sb.Spec.ShutdownTime == nil || sb.Spec.ShutdownTime.IsZero() || now.Before(sb.Spec.ShutdownTime.Time) {
+		return false
+	}
+	sb.Spec.ShutdownTime = nil
+	return true
 }

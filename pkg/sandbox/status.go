@@ -37,6 +37,10 @@ func Condition(sb *Sandbox, t string) *metav1.Condition {
 	return nil
 }
 
+// ReasonAwaitingController is the PhaseReason of a sandbox whose controller has
+// not reported a Ready condition yet. It is set here, not by the controller.
+const ReasonAwaitingController = "AwaitingController"
+
 // PhaseOf derives the phase from the sandbox status conditions.
 func PhaseOf(sb *Sandbox) (Phase, string) {
 	if sb == nil {
@@ -48,9 +52,6 @@ func PhaseOf(sb *Sandbox) (Phase, string) {
 	ready := Condition(sb, ConditionReady)
 	switch {
 	case ready == nil:
-		if sb.Status.ServiceFQDN == "" && sb.Status.NodeName == "" && len(sb.Status.PodIPs) == 0 {
-			return PhasePending, "Waiting for the sandbox controller"
-		}
 		return PhasePending, ""
 	case ready.Status == metav1.ConditionTrue:
 		return PhaseRunning, ready.Message
@@ -67,6 +68,30 @@ func PhaseOf(sb *Sandbox) (Phase, string) {
 	default:
 		return PhasePending, ready.Message
 	}
+}
+
+// PhaseReason is the stable reason a sandbox is not Running, for the GUI to
+// word in its own language: the Suspended or Ready condition's reason, or
+// ReasonAwaitingController before the controller reports. It is "" when Running.
+// The controller's message is free text and stays with PhaseOf.
+func PhaseReason(sb *Sandbox) string {
+	if sb == nil {
+		return ReasonAwaitingController
+	}
+	if c := Condition(sb, ConditionSuspended); c != nil && c.Status == metav1.ConditionTrue {
+		return ReasonSuspended
+	}
+	ready := Condition(sb, ConditionReady)
+	switch {
+	case ready == nil:
+		if sb.Status.ServiceFQDN == "" && sb.Status.NodeName == "" && len(sb.Status.PodIPs) == 0 {
+			return ReasonAwaitingController
+		}
+		return ""
+	case ready.Status == metav1.ConditionTrue:
+		return ""
+	}
+	return ready.Reason
 }
 
 // PodName is the backing pod of a sandbox: its own name, unless a legacy
