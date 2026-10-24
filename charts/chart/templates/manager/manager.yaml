@@ -90,8 +90,8 @@ spec:
         {{- range .Values.manager.args }}
         - {{ tpl . $ }}
         {{- end }}
-        command:
-        - /manager
+        # No command: the image's ENTRYPOINT runs the operator. Release images are
+        # built by ko (/ko-app/cmd); the Dockerfile image uses /manager.
         env:
         # The namespace the operator and its platform ConfigMap live in.
         - name: FORGEAI_NAMESPACE
