@@ -212,7 +212,7 @@ const DefaultSandboxNamespace = "agent-sandbox-system"
 // create dialogs.
 type Templates struct {
 	// Source is an https:// URL or a file:// directory holding index.yaml.
-	// Empty uses the forgeai default source (templates/ in the forgeai repository).
+	// Empty uses the forgeai default source (wutz/forgeai-templates on its main branch).
 	Source string `json:"source,omitempty"`
 }
 
