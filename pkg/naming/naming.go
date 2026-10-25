@@ -73,9 +73,21 @@ const (
 	LabelGPUCount   = "nvidia.com/gpu.count"
 	LabelGPUMemory  = "nvidia.com/gpu.memory"
 
+	// LabelInference is set on the model servers and the llm-d router of an
+	// InferenceService (value = InferenceService name). The router selects its
+	// model servers by it.
+	LabelInference = "forgeai.wutz.dev/inference"
+
 	ComponentFileServer = "fileserver"
 	ComponentSandbox    = "sandbox"
+	ComponentInference  = "inference"
 )
+
+// InferenceAPIKey is the key of the API key Secret of an InferenceService.
+const InferenceAPIKey = "api-key"
+
+// InferenceAPIKeySecret is the Secret holding the API key of an InferenceService.
+func InferenceAPIKeySecret(service string) string { return service + "-api-key" }
 
 // Fixed names inside a project namespace.
 const (

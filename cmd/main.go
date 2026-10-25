@@ -232,6 +232,9 @@ func main() {
 			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg, Activity: controller.LogActivity(clientset),
 		},
 		"volume-trash": &controller.PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: cfg},
+		"inferenceservice": &controller.InferenceServiceReconciler{
+			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg,
+		},
 		"trainjob": &controller.TrainJobReconciler{
 			Client: mgr.GetClient(), Config: cfg, Recorder: mgr.GetEventRecorder("forgeai-trainjob"),
 		},

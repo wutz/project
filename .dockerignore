@@ -12,3 +12,6 @@
 # Re-include Go module files
 !go.mod
 !go.sum
+
+# Re-include embedded assets (the llm-d router chart of pkg/inference)
+!pkg/inference/charts/*.tgz

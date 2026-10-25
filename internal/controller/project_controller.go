@@ -334,7 +334,11 @@ func resourceQuota(p *v1.Project, cfg *platform.Config, ns string, classes []ins
 }
 
 // limitRange gives containers without requests a small default, which the
-// ResourceQuota requires.
+// ResourceQuota requires. It sets no default limits: a default limit applies to
+// every container that declares none, so the 1 CPU default that used to be here
+// made the API server reject any container requesting more than 1 CPU or 1Gi
+// (a request above its own limit), such as the inference router's 4 and 8 CPU.
+// The quota counts requests only, so the limits bought nothing.
 func limitRange(p *v1.Project, ns string) *corev1.LimitRange {
 	return &corev1.LimitRange{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "LimitRange"},
@@ -343,9 +347,6 @@ func limitRange(p *v1.Project, ns string) *corev1.LimitRange {
 			Type: corev1.LimitTypeContainer,
 			DefaultRequest: corev1.ResourceList{
 				corev1.ResourceCPU: resource.MustParse("100m"), corev1.ResourceMemory: resource.MustParse("256Mi"),
-			},
-			Default: corev1.ResourceList{
-				corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi"),
 			},
 		}}},
 	}

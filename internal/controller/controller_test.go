@@ -154,6 +154,15 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		// 2 GPUs x 15 cores + 4 cores headroom.
 		Expect(cpu.String()).To(Equal("34"))
 
+		// The defaulted requests satisfy the quota. A default limit would apply
+		// to every container that declares none and reject any request above it,
+		// which is how a 4-CPU router pod used to be refused.
+		lr := &corev1.LimitRange{}
+		Expect(get(lr, ns, naming.LimitRangeName)()).To(Succeed())
+		Expect(lr.Spec.Limits).To(HaveLen(1))
+		Expect(lr.Spec.Limits[0].DefaultRequest).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
+		Expect(lr.Spec.Limits[0].Default).To(BeEmpty())
+
 		// Members read the platform config from their namespace.
 		pc := &corev1.ConfigMap{}
 		Expect(get(pc, ns, platform.ConfigMapName)()).To(Succeed())

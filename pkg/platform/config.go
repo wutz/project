@@ -170,6 +170,41 @@ type Sandbox struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// Inference configures the model servers of InferenceServices and the llm-d
+// routers in front of them.
+type Inference struct {
+	// Image is the vLLM server image, used by services without an image.
+	Image string `json:"image,omitempty"`
+	// RouterImage is the llm-d router Endpoint Picker image, with its tag.
+	RouterImage string `json:"routerImage,omitempty"`
+	// ShmSize is the /dev/shm emptyDir of a model server: tensor parallel
+	// workers exchange data through shared memory.
+	ShmSize resource.Quantity `json:"shmSize"`
+	// HFEndpoint is the Hugging Face endpoint the model servers download
+	// weights from (HF_ENDPOINT). Clusters without access to huggingface.co set
+	// a mirror here, such as https://hf-mirror.com.
+	HFEndpoint string `json:"hfEndpoint,omitempty"`
+	// Cache keeps the weights of each InferenceService on a PersistentVolume-
+	// Claim, so that a restart loads them again instead of downloading them.
+	// Empty uses an emptyDir, and every start downloads the weights.
+	Cache InferenceCache `json:"cache,omitempty"`
+	// StartupTimeout is how long a model server may take to become healthy: a
+	// cold start downloads the weights (tens of GB, over a mirror at a few MB/s)
+	// before it loads them into the GPUs. The pod is killed when it expires.
+	StartupTimeout metav1.Duration `json:"startupTimeout,omitzero"`
+}
+
+// InferenceCache is the volume holding the downloaded weights of a model.
+type InferenceCache struct {
+	// StorageClass of the claim; the default StorageClass when empty.
+	StorageClass string `json:"storageClass,omitempty"`
+	// Size of the claim.
+	Size resource.Quantity `json:"size"`
+}
+
+// Enabled reports whether a cache was configured.
+func (c InferenceCache) Enabled() bool { return c.StorageClass != "" || !c.Size.IsZero() }
+
 // DefaultSandboxNamespace is where agent-sandbox is installed.
 const DefaultSandboxNamespace = "agent-sandbox-system"
 
@@ -220,6 +255,7 @@ type Config struct {
 	FileServer    FileServer    `json:"fileServer"`
 	Training      Training      `json:"training"`
 	Sandbox       Sandbox       `json:"sandbox"`
+	Inference     Inference     `json:"inference"`
 	Templates     Templates     `json:"templates,omitzero"`
 
 	// TrashRetention is the default retention of deleted volumes.
@@ -312,6 +348,17 @@ func Parse(data []byte) (*Config, error) {
 		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
 	}
 	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
+	if c.Inference.Image == "" {
+		c.Inference.Image = "vllm/vllm-openai:v0.32.0"
+	}
+	if c.Inference.RouterImage == "" {
+		c.Inference.RouterImage = "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0"
+	}
+	defaultQuantity(&c.Inference.ShmSize, "16Gi")
+	defaultDuration(&c.Inference.StartupTimeout, 2*time.Hour)
+	if c.Inference.Cache.Enabled() {
+		defaultQuantity(&c.Inference.Cache.Size, "200Gi")
+	}
 	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }

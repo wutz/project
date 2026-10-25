@@ -5,6 +5,7 @@ resources:
 - bases/forgeai.wutz.dev_projects.yaml
 - bases/forgeai.wutz.dev_instancetypes.yaml
 - bases/forgeai.wutz.dev_fileservers.yaml
+- bases/forgeai.wutz.dev_inferenceservices.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

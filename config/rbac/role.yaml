@@ -8,16 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - limitranges
   - namespaces
   - persistentvolumeclaims
@@ -117,6 +107,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers
+  - inferenceservices
   - instancetypes
   - projects
   verbs:
@@ -131,6 +122,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers/finalizers
+  - inferenceservices/finalizers
   - projects/finalizers
   verbs:
   - update
@@ -138,12 +130,25 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers/status
+  - inferenceservices/status
   - instancetypes/status
   - projects/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - inference.networking.k8s.io
+  resources:
+  - inferencepools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - jobset.x-k8s.io
   resources:
@@ -175,6 +180,15 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - llm-d.ai
+  resources:
+  - inferencemodelrewrites
+  - inferenceobjectives
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - networking.k8s.io
