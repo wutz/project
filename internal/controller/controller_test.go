@@ -548,6 +548,18 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Eventually(activeOf, timeout, interval).Should(BeTrue())
 	})
 
+	It("rebinds a member whose role changed", func() {
+		p := &v1.Project{}
+		Expect(get(p, "", project)()).To(Succeed())
+		p.Spec.Members[0].Role = v1.RoleView
+		Expect(k8sClient.Update(ctx, p)).To(Succeed())
+		Eventually(func() string {
+			rb := &rbacv1.RoleBinding{}
+			_ = get(rb, ns, "forgeai-member-alice")()
+			return rb.RoleRef.Name
+		}, timeout, interval).Should(Equal("forgeai-project-view"))
+	})
+
 	It("deletes the namespace and registry with deletionPolicy Delete", func() {
 		p := &v1.Project{}
 		Expect(get(p, "", project)()).To(Succeed())

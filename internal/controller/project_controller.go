@@ -183,6 +183,24 @@ func apply(ctx context.Context, c client.Client, obj client.Object) error {
 	return c.Apply(ctx, client.ApplyConfigurationFromUnstructured(u), fieldOwner, client.ForceOwnership)
 }
 
+// dropStaleRoleBinding deletes a member's RoleBinding when it names another
+// role. A RoleBinding's roleRef cannot be changed in place, so the binding is
+// applied again after the delete, with the role the member now has.
+func (r *ProjectReconciler) dropStaleRoleBinding(ctx context.Context, name, ns string, want rbacv1.RoleRef) error {
+	rb := &rbacv1.RoleBinding{}
+	err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, rb)
+	if apierrors.IsNotFound(err) || (err == nil && rb.RoleRef == want) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := r.Delete(ctx, rb); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project, cfg *platform.Config, ns string) error {
 	if err := r.ensureNamespace(ctx, p, ns); err != nil {
 		return err
@@ -496,6 +514,10 @@ func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project,
 		want[sa] = true
 		ml := projectLabels(p)
 		ml[naming.LabelMember] = m.Name
+		roleRef := rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: kindClusterRole, Name: naming.ClusterRolePrefix + string(role)}
+		if err := r.dropStaleRoleBinding(ctx, naming.MemberRoleBinding(m.Name), ns, roleRef); err != nil {
+			return fmt.Errorf("member %s: %w", m.Name, err)
+		}
 		objs := []client.Object{
 			&corev1.ServiceAccount{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
@@ -514,7 +536,7 @@ func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project,
 			&rbacv1.RoleBinding{
 				TypeMeta:   metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "RoleBinding"},
 				ObjectMeta: metav1.ObjectMeta{Name: naming.MemberRoleBinding(m.Name), Namespace: ns, Labels: ml, OwnerReferences: ownerRefs(p)},
-				RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: kindClusterRole, Name: naming.ClusterRolePrefix + string(role)},
+				RoleRef:    roleRef,
 				Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa, Namespace: mns}},
 			},
 		}
