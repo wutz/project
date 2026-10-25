@@ -66,6 +66,11 @@ rules:
 - apiGroups: [""]
   resources: [persistentvolumeclaims, pods, pods/log, events, resourcequotas, limitranges]
   verbs: [get, list, watch]
+# The copy of the platform config the GUI reads; the operator writes it into each project.
+- apiGroups: [""]
+  resources: [configmaps]
+  resourceNames: [forgeai-platform]
+  verbs: [get]
 - apiGroups: [events.k8s.io]
   resources: [events]
   verbs: [get, list, watch]
