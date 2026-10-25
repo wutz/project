@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,6 +92,9 @@ type Form struct {
 	// heartbeat. Nil uses the platform's sandbox.idleTimeout; 0 turns the idle
 	// policy off for this sandbox.
 	IdleTimeout *metav1.Duration `json:"idleTimeout,omitempty"`
+	// GatewayPort publishes the HTTP server on this port of the sandbox
+	// through the platform gateway. 0 keeps the sandbox inside the cluster.
+	GatewayPort int `json:"gatewayPort,omitempty"`
 }
 
 var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
@@ -171,6 +175,9 @@ func (f *Form) Validate() error {
 	}
 	if f.IdleTimeout != nil && f.IdleTimeout.Duration > maxDuration {
 		return fmt.Errorf("idleTimeout must not exceed one year")
+	}
+	if f.GatewayPort < 0 || f.GatewayPort > 65535 {
+		return fmt.Errorf("gatewayPort must be between 1 and 65535")
 	}
 	return nil
 }
@@ -413,6 +420,14 @@ func Render(f *Form, c Context) (*unstructured.Unstructured, error) {
 	}
 	if f.IdleTimeout != nil {
 		sb.Annotations[naming.AnnotationIdleTimeout] = f.IdleTimeout.Duration.String()
+	}
+	if f.GatewayPort > 0 {
+		if cfg != nil {
+			if err := CheckGateway(f.Name, c.Namespace, cfg); err != nil {
+				return nil, err
+			}
+		}
+		sb.Annotations[naming.AnnotationGatewayPort] = strconv.Itoa(f.GatewayPort)
 	}
 	return ToUnstructured(sb)
 }

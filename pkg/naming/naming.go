@@ -37,6 +37,9 @@ const (
 	// AnnotationIdleTimeout is the idle timeout a Sandbox was created with
 	// (Go duration); absent means the platform's sandbox.idleTimeout applies.
 	AnnotationIdleTimeout = "forgeai.wutz.dev/idle-timeout"
+	// AnnotationGatewayPort is the port a Sandbox serves HTTP on, published
+	// through the platform gateway; absent means it is not published.
+	AnnotationGatewayPort = "forgeai.wutz.dev/gateway-port"
 
 	// LabelTemplate marks a TrainingRuntime as a user job template.
 	LabelTemplate = "forgeai.wutz.dev/template"

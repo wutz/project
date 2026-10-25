@@ -53,6 +53,7 @@ const testPlatformConfig = `
 namespacePrefix: forge-
 apiServer: https://api.example.com:6443
 ingress: {className: nginx, domain: example.com, port: 7443}
+gateway: {name: forgeai-sandbox, namespace: forgeai-system, scheme: http, port: 8080}
 registry: {domain: cr.example.com:7443, adminSecret: harbor-admin}
 storageTypes:
   shared: {storageClass: shared}
@@ -159,7 +160,7 @@ var _ = BeforeSuite(func() {
 		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
-		&SandboxReconciler{Client: mgr.GetClient(), Config: loader},
+		&SandboxReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, Gateway: true},
 		&SSHGatewayReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
 		&SSHRouteReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 	} {

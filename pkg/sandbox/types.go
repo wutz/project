@@ -24,6 +24,8 @@ var (
 	SandboxTemplateGVK = schema.GroupVersionKind{Group: ExtensionsGroup, Version: Version, Kind: "SandboxTemplate"}
 	SandboxClaimGVK    = schema.GroupVersionKind{Group: ExtensionsGroup, Version: Version, Kind: "SandboxClaim"}
 	SandboxWarmPoolGVK = schema.GroupVersionKind{Group: ExtensionsGroup, Version: Version, Kind: "SandboxWarmPool"}
+	// HTTPRouteGVK is the Gateway API route that publishes a sandbox port.
+	HTTPRouteGVK = schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "HTTPRoute"}
 )
 
 // Labels and annotations set by the agent-sandbox controller.
@@ -36,6 +38,9 @@ const (
 	LabelTemplateRef = "agents.x-k8s.io/sandbox-template-ref"
 	// AnnotationPodName is the backing pod of a legacy (warm pool) sandbox.
 	AnnotationPodName = "agents.x-k8s.io/pod-name"
+	// LabelSandboxNameHash is set on the pods of a sandbox and selects them
+	// from the sandbox's own Service.
+	LabelSandboxNameHash = "agents.x-k8s.io/sandbox-name-hash"
 )
 
 // Condition types and the reasons forgeai distinguishes.

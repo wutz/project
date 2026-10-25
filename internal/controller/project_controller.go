@@ -374,6 +374,10 @@ func networkPolicy(p *v1.Project, cfg *platform.Config, ns string) *networkingv1
 		from = append(from, nsPeer(n))
 	}
 	from = append(from, agents)
+	// The gateway proxies the ports sandboxes publish, so its pods reach them.
+	if cfg.Gateway.Enabled() {
+		from = append(from, nsPeer(cfg.Gateway.Namespace))
+	}
 	np := &networkingv1.NetworkPolicy{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "networking.k8s.io/v1", Kind: "NetworkPolicy"},
 		ObjectMeta: metav1.ObjectMeta{Name: naming.NetworkPolicyName, Namespace: ns, Labels: projectLabels(p)},

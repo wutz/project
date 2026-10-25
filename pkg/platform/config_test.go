@@ -47,3 +47,21 @@ func TestDefaults(t *testing.T) {
 		t.Error("expected unknown storage type error")
 	}
 }
+
+func TestGatewayURL(t *testing.T) {
+	for _, tc := range []struct {
+		scheme string
+		port   int
+		want   string
+	}{
+		{"http", 8080, "http://web.example.com:8080"},
+		{"http", 80, "http://web.example.com"},
+		{"https", 443, "https://web.example.com"},
+		{"https", 8443, "https://web.example.com:8443"},
+	} {
+		g := Gateway{Name: "gw", Scheme: tc.scheme, Port: tc.port}
+		if got := g.URL("web.example.com"); got != tc.want {
+			t.Errorf("URL(%s:%d) = %q, want %q", tc.scheme, tc.port, got, tc.want)
+		}
+	}
+}

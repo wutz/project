@@ -60,6 +60,40 @@ func (i Ingress) URL(sub string) string {
 // Host returns <sub>.<domain>.
 func (i Ingress) Host(sub string) string { return sub + "." + i.Domain }
 
+// Gateway publishes sandbox ports through a Gateway API Gateway. A sandbox with
+// a gateway port gets an HTTPRoute on <name>-<namespace>.<ingress domain>.
+type Gateway struct {
+	// Name and Namespace of the Gateway the routes attach to. Its listeners
+	// must admit routes from the project namespaces.
+	Name      string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	// SectionName is the listener the routes attach to; empty means any.
+	SectionName string `json:"sectionName,omitempty"`
+	// Scheme and Port are the listener as seen from outside, for the URLs
+	// shown in the GUI. Scheme defaults to https.
+	Scheme string `json:"scheme,omitempty"`
+	Port   int    `json:"port,omitempty"`
+}
+
+// Enabled reports whether a gateway is configured.
+func (g Gateway) Enabled() bool { return g.Name != "" }
+
+// URL returns the external URL of host, omitting the scheme's default port.
+func (g Gateway) URL(host string) string {
+	u := g.Scheme + "://" + host
+	if g.Port != 0 && g.Port != defaultPort(g.Scheme) {
+		u += fmt.Sprintf(":%d", g.Port)
+	}
+	return u
+}
+
+func defaultPort(scheme string) int {
+	if scheme == "http" {
+		return 80
+	}
+	return 443
+}
+
 // Registry is the Harbor instance holding project images.
 type Registry struct {
 	// Domain is host[:port] used for pushes and pulls.
@@ -259,6 +293,7 @@ type Config struct {
 	MembersNamespace string `json:"membersNamespace,omitempty"`
 
 	Ingress  Ingress  `json:"ingress"`
+	Gateway  Gateway  `json:"gateway,omitzero"`
 	Registry Registry `json:"registry"`
 
 	// StorageTypes maps a volume type (e.g. shared) to its StorageClass.
@@ -319,6 +354,9 @@ func Parse(data []byte) (*Config, error) {
 	}
 	if c.Ingress.Port == 0 {
 		c.Ingress.Port = 443
+	}
+	if c.Gateway.Scheme == "" {
+		c.Gateway.Scheme = "https"
 	}
 	if c.Registry.AdminSecret == "" {
 		c.Registry.AdminSecret = "forgeai-harbor"

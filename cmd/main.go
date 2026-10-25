@@ -247,13 +247,24 @@ func main() {
 	}
 	// agent-sandbox is optional: without its CRDs the rest of forgeai still
 	// runs, and the Sandbox controller is registered once they are installed.
+	// The Gateway API is optional too: without HTTPRoutes sandboxes are not
+	// published through the gateway.
 	gvk := sandbox.SandboxGVK
 	if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
 		setupLog.Info("agent-sandbox CRDs are not installed; the Sandbox controller is off")
-	} else if err := (&controller.SandboxReconciler{Client: mgr.GetClient(), Config: cfg}).
-		SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "sandbox")
-		os.Exit(1)
+	} else {
+		routes := false
+		if _, err := mgr.GetRESTMapper().RESTMapping(sandbox.HTTPRouteGVK.GroupKind(), sandbox.HTTPRouteGVK.Version); err != nil {
+			setupLog.Info("Gateway API HTTPRoute CRD is not installed; sandboxes are not published through the gateway")
+		} else {
+			routes = true
+		}
+		if err := (&controller.SandboxReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, Gateway: routes,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", "sandbox")
+			os.Exit(1)
+		}
 	}
 	// The SSH gateway is optional too: its routing table is sshpiper Pipes, so
 	// without the sshpiper CRD the gateway and route controllers stay off.
