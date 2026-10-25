@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/wutz/forgeai/pkg/naming"
@@ -68,5 +69,30 @@ func TestScriptOfInvertsCommand(t *testing.T) {
 	}
 	if got := ScriptOf([]string{"/bin/agent", "--flag"}); got != "/bin/agent --flag" {
 		t.Errorf("ScriptOf of a plain argv = %q", got)
+	}
+}
+
+func TestTemplateFormValidate(t *testing.T) {
+	cases := map[string]struct {
+		form    TemplateForm
+		wantErr string
+	}{
+		"plain name":          {form: TemplateForm{Name: "claude-agent"}},
+		"uppercase name":      {form: TemplateForm{Name: "Agent"}, wantErr: "invalid name"},
+		"digit first":         {form: TemplateForm{Name: "1agent"}, wantErr: "invalid name"},
+		"name at the limit":   {form: TemplateForm{Name: "a" + strings.Repeat("b", MaxNameLength-1)}},
+		"name over the limit": {form: TemplateForm{Name: "a" + strings.Repeat("b", MaxNameLength)}, wantErr: "invalid name"},
+		"blank env name":      {form: TemplateForm{Name: "agent", Env: []EnvVar{{Name: " ", Value: "x"}}}, wantErr: "need a name"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := tc.form.Validate()
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Errorf("Validate = %v, want nil", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Errorf("Validate = %v, want an error containing %q", err, tc.wantErr)
+			}
+		})
 	}
 }
