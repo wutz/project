@@ -17,15 +17,24 @@ import (
 	"github.com/wutz/forgeai/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/sshgateway"
 )
 
 // MaxNameLength keeps the name usable as a Service name (the controller
 // creates a Service named after the sandbox).
 const MaxNameLength = 63
 
+// MaxSSHNameLength keeps "<name>-ssh", the SSH Service of a sandbox, usable as
+// a Service name.
+const MaxSSHNameLength = MaxNameLength - len("-ssh")
+
 const (
 	// ContainerName is the sandbox container forgeai renders.
 	ContainerName = "sandbox"
+	// volumeSSHD holds the sshd keys of an SSH sandbox.
+	volumeSSHD = "forgeai-sshd"
+	// SSHPort is the port sshd listens on in the sidecar.
+	SSHPort = 22
 	// volumeShm and volumePrefix name the /dev/shm emptyDir and the volumes
 	// mounted from project PVCs.
 	volumeShm    = "dshm"
@@ -67,6 +76,9 @@ type Form struct {
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 	// Service exposes the sandbox under a stable DNS name.
 	Service bool `json:"service,omitempty"`
+	// SSH runs an sshd beside the agent, reachable through an SSHGateway whose
+	// SSHRoute names the sandbox. Only the platform identity key can log in.
+	SSH bool `json:"ssh,omitempty"`
 	// Volumes mounts project volumes.
 	Volumes []VolumeMount `json:"volumes,omitempty"`
 	// Template names the SandboxTemplate the GUI prefilled the form from; it
@@ -127,6 +139,9 @@ func (f *Form) Validate() error {
 	if !nameRE.MatchString(f.Name) || len(f.Name) > MaxNameLength {
 		return fmt.Errorf("invalid name %q: lowercase letters, digits and '-', starting with a letter, at most %d characters",
 			f.Name, MaxNameLength)
+	}
+	if f.SSH && len(f.Name) > MaxSSHNameLength {
+		return fmt.Errorf("a sandbox with SSH is named at most %d characters", MaxSSHNameLength)
 	}
 	if strings.TrimSpace(f.Image) == "" {
 		return fmt.Errorf("image is required")
@@ -237,6 +252,67 @@ func volumes(f *Form, shm resource.Quantity) ([]corev1.Volume, []corev1.VolumeMo
 	return vols, mounts
 }
 
+// sshdCapabilities are the capabilities the sshd sidecar keeps; the others are
+// dropped. sshd starts as root to log users in and drops to the login user.
+var sshdCapabilities = []corev1.Capability{
+	"CHOWN", "DAC_OVERRIDE", "FOWNER", "KILL", "NET_BIND_SERVICE", "SETGID", "SETUID", "SYS_CHROOT",
+}
+
+// sshImage is the sshd sidecar image: the platform's, or the default without a
+// platform config.
+func sshImage(cfg *platform.Config) string {
+	if cfg != nil && cfg.Sandbox.SSHImage != "" {
+		return cfg.Sandbox.SSHImage
+	}
+	return platform.DefaultSSHImage
+}
+
+// withSSH adds the sshd sidecar of an SSH sandbox to its pod. The sidecar mounts
+// the project volumes of the agent but neither its image nor its processes, so
+// an SSH session sees the files of the volumes and the sidecar's environment.
+// Its keys come from the Secret of the sandbox's SSH Service, which the operator
+// writes: the host key, and the platform public key as the only authorized key.
+func withSSH(pod *corev1.PodSpec, name string, agentMounts []corev1.VolumeMount, image string) {
+	var mounts []corev1.VolumeMount
+	for _, m := range agentMounts {
+		// /dev/shm stays with the agent; sshd does not use it.
+		if m.Name != volumeShm {
+			mounts = append(mounts, m)
+		}
+	}
+	mounts = append(mounts, corev1.VolumeMount{Name: volumeSSHD, MountPath: sshgateway.SSHDKeysDir, ReadOnly: true})
+	pod.Volumes = append(pod.Volumes, corev1.Volume{Name: volumeSSHD, VolumeSource: corev1.VolumeSource{
+		Secret: &corev1.SecretVolumeSource{
+			SecretName: naming.SSHHostKeySecret(naming.SSHServiceName(name)),
+			Items: []corev1.KeyToPath{
+				{Key: sshgateway.SSHHostKeyKey, Path: sshgateway.SSHHostKeyKey, Mode: new(int32(0o400))},
+				{Key: sshgateway.SSHAuthorizedKeyKey, Path: sshgateway.SSHAuthorizedKeyKey, Mode: new(int32(0o444))},
+			},
+		},
+	}})
+	rl := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("50m"),
+		corev1.ResourceMemory: resource.MustParse("64Mi"),
+	}
+	pod.Containers = append(pod.Containers, corev1.Container{
+		Name:         naming.SSHSidecarContainer,
+		Image:        image,
+		Command:      []string{sshgateway.SSHDEntrypoint},
+		Args:         sshgateway.SSHDArgs(),
+		Ports:        []corev1.ContainerPort{{Name: "ssh", ContainerPort: SSHPort, Protocol: corev1.ProtocolTCP}},
+		VolumeMounts: mounts,
+		Resources:    corev1.ResourceRequirements{Requests: rl, Limits: rl.DeepCopy()},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:                new(int64(0)),
+			AllowPrivilegeEscalation: new(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+				Add:  sshdCapabilities,
+			},
+		},
+	})
+}
+
 // Render builds the Sandbox of a form. Placement, resources, volumes, the
 // isolation runtime class and the registry pull secret come from the platform
 // settings and the instance type; the agent itself from the form.
@@ -287,6 +363,9 @@ func Render(f *Form, c Context) (*unstructured.Unstructured, error) {
 	if runtimeClass != "" {
 		pod.RuntimeClassName = &runtimeClass
 	}
+	if f.SSH {
+		withSSH(&pod, f.Name, mounts, sshImage(cfg))
+	}
 	if c.RegistrySecret != "" {
 		pod.ImagePullSecrets = []corev1.LocalObjectReference{{Name: c.RegistrySecret}}
 	}
@@ -315,6 +394,11 @@ func Render(f *Form, c Context) (*unstructured.Unstructured, error) {
 	}
 	if f.Service {
 		sb.Spec.Service = new(true)
+	}
+	if f.SSH {
+		labels[naming.LabelSSH] = naming.LiteralTrue
+		// The SSH Service selects the pod by its sandbox name.
+		sb.Spec.PodTemplate.ObjectMeta.Labels = map[string]string{naming.LabelSandbox: f.Name}
 	}
 	if f.TTL.Duration > 0 {
 		at := metav1.NewTime(now.Add(f.TTL.Duration))
@@ -368,6 +452,7 @@ func FormOf(sb *Sandbox) *Form {
 		RuntimeClass: ptrString(sb.Spec.PodTemplate.Spec.RuntimeClassName),
 		Service:      sb.Spec.Service != nil && *sb.Spec.Service,
 		InstanceType: sb.Labels[naming.LabelInstanceType],
+		SSH:          sb.Labels[naming.LabelSSH] == naming.LiteralTrue,
 	}
 	for _, ctr := range sb.Spec.PodTemplate.Spec.Containers {
 		if ctr.Name != ContainerName {

@@ -3,4 +3,7 @@
 resources:
 - forgeai_v1alpha1_project.yaml
 - forgeai_v1alpha1_fileserver.yaml
+- forgeai_v1alpha1_sshgatewayclass.yaml
+- forgeai_v1alpha1_sshgateway.yaml
+- forgeai_v1alpha1_sshroute.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

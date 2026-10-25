@@ -48,6 +48,7 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
+	"github.com/wutz/forgeai/pkg/sshgateway"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -253,6 +254,28 @@ func main() {
 		SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "sandbox")
 		os.Exit(1)
+	}
+	// The SSH gateway is optional too: its routing table is sshpiper Pipes, so
+	// without the sshpiper CRD the gateway and route controllers stay off.
+	pipeGVK := sshgateway.PipeGVK
+	if _, err := mgr.GetRESTMapper().RESTMapping(pipeGVK.GroupKind(), pipeGVK.Version); err != nil {
+		setupLog.Info("sshpiper Pipe CRD is not installed; the SSH gateway controllers are off")
+	} else {
+		if err := (&controller.SSHGatewayReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			Config: cfg,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", "sshgateway")
+			os.Exit(1)
+		}
+		if err := (&controller.SSHRouteReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", "sshroute")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

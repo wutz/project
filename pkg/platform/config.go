@@ -168,6 +168,21 @@ type Sandbox struct {
 	// Namespace runs the agent-sandbox controller; project network policies
 	// let it reach the sandbox pods.
 	Namespace string `json:"namespace,omitempty"`
+	// SSHImage is the sshd sidecar of a sandbox that enables SSH. It must accept
+	// only the platform identity key and public-key logins.
+	SSHImage string `json:"sshImage,omitempty"`
+}
+
+// Default images of the SSH access. The sshd image is built from images/sshd.
+const (
+	DefaultSSHImage        = "ghcr.io/wutz/forgeai-sshd:0.1.0"
+	DefaultSSHGatewayImage = "ghcr.io/tg123/sshpiperd:v1.6.1"
+)
+
+// SSH configures the SSH gateways.
+type SSH struct {
+	// GatewayImage is the sshpiperd image that serves the SSH gateways.
+	GatewayImage string `json:"gatewayImage,omitempty"`
 }
 
 // Inference configures the model servers of InferenceServices and the llm-d
@@ -255,6 +270,7 @@ type Config struct {
 	FileServer    FileServer    `json:"fileServer"`
 	Training      Training      `json:"training"`
 	Sandbox       Sandbox       `json:"sandbox"`
+	SSH           SSH           `json:"ssh,omitzero"`
 	Inference     Inference     `json:"inference"`
 	Templates     Templates     `json:"templates,omitzero"`
 
@@ -348,6 +364,12 @@ func Parse(data []byte) (*Config, error) {
 		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
 	}
 	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
+	if c.Sandbox.SSHImage == "" {
+		c.Sandbox.SSHImage = DefaultSSHImage
+	}
+	if c.SSH.GatewayImage == "" {
+		c.SSH.GatewayImage = DefaultSSHGatewayImage
+	}
 	if c.Inference.Image == "" {
 		c.Inference.Image = "vllm/vllm-openai:v0.32.0"
 	}

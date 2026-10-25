@@ -129,6 +129,18 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
+# SSHD_IMG is the sshd sidecar of SSH sandboxes; the platform's sandbox.sshImage
+# must name the same image.
+SSHD_IMG ?= ghcr.io/wutz/forgeai-sshd:0.1.0
+
+.PHONY: sshd-image
+sshd-image: ## Build the sshd sidecar image of SSH sandboxes.
+	$(CONTAINER_TOOL) build -t ${SSHD_IMG} images/sshd
+
+.PHONY: sshd-push
+sshd-push: ## Push the sshd sidecar image of SSH sandboxes.
+	$(CONTAINER_TOOL) push ${SSHD_IMG}
+
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/

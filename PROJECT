@@ -44,4 +44,29 @@ resources:
   kind: PersistentVolumeClaim
   path: k8s.io/api/core/v1
   version: v1
+- api:
+    crdVersion: v1
+  domain: wutz.dev
+  group: forgeai
+  kind: SSHGatewayClass
+  path: github.com/wutz/forgeai/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: wutz.dev
+  group: forgeai
+  kind: SSHGateway
+  path: github.com/wutz/forgeai/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: wutz.dev
+  group: forgeai
+  kind: SSHRoute
+  path: github.com/wutz/forgeai/api/v1alpha1
+  version: v1alpha1
 version: "3"

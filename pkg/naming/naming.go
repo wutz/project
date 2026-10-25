@@ -78,10 +78,43 @@ const (
 	// model servers by it.
 	LabelInference = "forgeai.wutz.dev/inference"
 
+	// LabelSSH is set on a sandbox that serves SSH (value = "true"). The
+	// operator adds the sshd sidecar and the Service of the sandbox for it.
+	LabelSSH = "forgeai.wutz.dev/ssh"
+	// LabelSandbox is set on the pods of a sandbox (value = Sandbox name). The
+	// SSH Service selects its sshd by it.
+	LabelSandbox = "forgeai.wutz.dev/sandbox"
+	// LabelSSHGateway is set on the Pipes and the sshpiperd objects of an
+	// SSHGateway (value = SSHGateway name).
+	LabelSSHGateway = "forgeai.wutz.dev/ssh-gateway"
+	// AnnotationSSHRoute is the namespace/name of the SSHRoute a Pipe serves.
+	AnnotationSSHRoute = "forgeai.wutz.dev/ssh-route"
+	// AnnotationSSHRule is the index of the SSHRoute rule a Pipe serves.
+	AnnotationSSHRule = "forgeai.wutz.dev/ssh-rule"
+
 	ComponentFileServer = "fileserver"
 	ComponentSandbox    = "sandbox"
 	ComponentInference  = "inference"
+	ComponentSSHGateway = "ssh-gateway"
 )
+
+// SSHSidecarContainer is the name of the sshd container of a sandbox.
+const SSHSidecarContainer = "sshd"
+
+// SSHIdentitySecretName is the platform Secret in the platform namespace that
+// holds the key the gateway uses to log in to sandboxes.
+const SSHIdentitySecretName = "forgeai-ssh"
+
+// SSHHostKeySecret is the Secret of an SSH Service that holds the host key of
+// the sshd behind it. The gateway pins that key from it.
+func SSHHostKeySecret(service string) string { return service + "-hostkey" }
+
+// SSHServiceName is the Service that exposes the sshd of a sandbox.
+func SSHServiceName(sandbox string) string { return sandbox + "-ssh" }
+
+// SSHGatewayName is the name of the sshpiperd Deployment, Service and
+// ConfigMap of an SSHGateway.
+func SSHGatewayName(gateway string) string { return "sshgateway-" + gateway }
 
 // InferenceAPIKey is the key of the API key Secret of an InferenceService.
 const InferenceAPIKey = "api-key"

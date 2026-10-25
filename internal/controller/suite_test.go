@@ -160,6 +160,8 @@ var _ = BeforeSuite(func() {
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
 		&SandboxReconciler{Client: mgr.GetClient(), Config: loader},
+		&SSHGatewayReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
+		&SSHRouteReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 	} {
 		Expect(r.SetupWithManager(mgr)).To(Succeed())
 	}
