@@ -526,9 +526,11 @@ func IsSandboxPaused(sb *Sandbox) bool {
 // the resource quota in the GUI.
 func CPUAndMemory(sb *Sandbox) (cpu, mem resource.Quantity) {
 	for _, c := range sb.Spec.PodTemplate.Spec.Containers {
-		if c.Resources.Requests != nil {
-			cpu.Add(*c.Resources.Requests.Cpu())
-			mem.Add(*c.Resources.Requests.Memory())
+		if q, ok := requestOf(c.Resources, corev1.ResourceCPU); ok {
+			cpu.Add(q)
+		}
+		if q, ok := requestOf(c.Resources, corev1.ResourceMemory); ok {
+			mem.Add(q)
 		}
 	}
 	return cpu, mem
@@ -538,11 +540,21 @@ func CPUAndMemory(sb *Sandbox) (cpu, mem resource.Quantity) {
 func GPU(sb *Sandbox) int64 {
 	var n int64
 	for _, c := range sb.Spec.PodTemplate.Spec.Containers {
-		if q, ok := c.Resources.Requests[instancetype.ResourceGPU]; ok {
+		if q, ok := requestOf(c.Resources, instancetype.ResourceGPU); ok {
 			n += q.Value()
 		}
 	}
 	return n
+}
+
+// requestOf is the amount of a resource a container requests. Kubernetes takes
+// a missing request to be the limit, so the limit stands in for it.
+func requestOf(res corev1.ResourceRequirements, name corev1.ResourceName) (resource.Quantity, bool) {
+	if q, ok := res.Requests[name]; ok {
+		return q, true
+	}
+	q, ok := res.Limits[name]
+	return q, ok
 }
 
 // ReopenElapsed clears a shutdown time that has already passed, so a sandbox that

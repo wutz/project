@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -136,7 +137,8 @@ func ExecutableCommand(sb *Sandbox) []string {
 	for _, c := range sb.Spec.PodTemplate.Spec.Containers {
 		if c.Name == ContainerName {
 			if len(c.Command) > 0 {
-				return append(c.Command, c.Args...)
+				// A new slice: appending to c.Command could write into its spare capacity.
+				return slices.Concat(c.Command, c.Args)
 			}
 			return nil
 		}

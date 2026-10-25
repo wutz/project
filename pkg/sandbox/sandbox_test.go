@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -411,5 +412,48 @@ func TestReopenElapsed(t *testing.T) {
 		if !c.cleared && c.shutdown != nil && sb.Spec.ShutdownTime == nil {
 			t.Errorf("%s: shutdown time dropped while still ahead", name)
 		}
+	}
+}
+
+func TestCPUAndMemoryReadRequestsThenLimits(t *testing.T) {
+	sb := &Sandbox{}
+	sb.Spec.PodTemplate.Spec.Containers = []corev1.Container{
+		{Name: ContainerName, Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+			},
+		}},
+		{Name: "sidecar", Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+		}},
+	}
+	cpu, mem := CPUAndMemory(sb)
+	// The main container requests 2 CPUs, the sidecar has only a limit of 500m.
+	if cpu.Cmp(resource.MustParse("2500m")) != 0 {
+		t.Errorf("CPU %s, want 2500m", cpu.String())
+	}
+	// Memory has no request, so the limit counts.
+	if mem.Cmp(resource.MustParse("8Gi")) != 0 {
+		t.Errorf("memory %s, want 8Gi", mem.String())
+	}
+}
+
+func TestGPUCountsRequestsThenLimits(t *testing.T) {
+	sb := &Sandbox{}
+	sb.Spec.PodTemplate.Spec.Containers = []corev1.Container{
+		{Name: ContainerName, Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{instancetype.ResourceGPU: resource.MustParse("2")},
+		}},
+		{Name: "sidecar", Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{instancetype.ResourceGPU: resource.MustParse("1")},
+		}},
+	}
+	if got := GPU(sb); got != 3 {
+		t.Errorf("GPU %d, want 3", got)
+	}
+	if got := GPU(&Sandbox{}); got != 0 {
+		t.Errorf("GPU of a sandbox without containers %d, want 0", got)
 	}
 }
