@@ -160,6 +160,7 @@ var _ = BeforeSuite(func() {
 		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
+		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
 		&SandboxReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, Gateway: true},
 		&SSHGatewayReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
 		&SSHRouteReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
