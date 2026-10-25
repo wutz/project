@@ -226,7 +226,8 @@ const DefaultSandboxNamespace = "agent-sandbox-system"
 // Templates configures the public template source the GUI offers in the
 // create dialogs.
 type Templates struct {
-	// Source is an https:// URL or a file:// directory holding index.yaml.
+	// Source is an https:// URL, a file:// directory holding index.yaml, or an
+	// oci:// reference to a published source.
 	// Empty uses the forgeai default source (wutz/forgeai-templates on its main branch).
 	Source string `json:"source,omitempty"`
 }
