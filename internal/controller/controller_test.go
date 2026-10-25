@@ -493,6 +493,61 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		))
 	})
 
+	It("deactivates the Kueue Workload of a stopped TrainJob and reactivates it on resume", func() {
+		f := &training.Form{Name: "pause", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
+		it := &v1.InstanceType{}
+		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
+		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
+		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
+		Expect(err).NotTo(HaveOccurred())
+		m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tj)
+		Expect(err).NotTo(HaveOccurred())
+		u := &unstructured.Unstructured{Object: m}
+		unstructured.RemoveNestedField(u.Object, "metadata", "creationTimestamp")
+		Expect(k8sClient.Create(ctx, u)).To(Succeed())
+
+		// Kueue admits the job through a Workload labeled with the job's UID.
+		wl := &unstructured.Unstructured{}
+		wl.SetGroupVersionKind(kf.WorkloadGVK)
+		wl.SetNamespace(ns)
+		wl.SetName("pause-workload")
+		wl.SetLabels(map[string]string{kf.LabelKueueJobUID: string(u.GetUID())})
+		Expect(k8sClient.Create(ctx, wl)).To(Succeed())
+
+		activeOf := func() bool {
+			got := &unstructured.Unstructured{}
+			got.SetGroupVersionKind(kf.WorkloadGVK)
+			Expect(get(got, ns, "pause-workload")()).To(Succeed())
+			active, found, _ := unstructured.NestedBool(got.Object, "spec", "active")
+			return !found || active
+		}
+		Eventually(activeOf, timeout, interval).Should(BeTrue())
+
+		setStopped := func(stopped bool) {
+			Eventually(func() error {
+				cur := trainJob(ns, "pause")
+				ann := cur.GetAnnotations()
+				if ann == nil {
+					ann = map[string]string{}
+				}
+				if stopped {
+					ann[training.AnnotationStopped] = naming.LiteralTrue
+				} else {
+					delete(ann, training.AnnotationStopped)
+				}
+				cur.SetAnnotations(ann)
+				return k8sClient.Update(ctx, cur)
+			}, timeout, interval).Should(Succeed())
+		}
+
+		// Stopping the job evicts its Workload, which Kueue turns into suspended pods.
+		setStopped(true)
+		Eventually(activeOf, timeout, interval).Should(BeFalse())
+
+		setStopped(false)
+		Eventually(activeOf, timeout, interval).Should(BeTrue())
+	})
+
 	It("deletes the namespace and registry with deletionPolicy Delete", func() {
 		p := &v1.Project{}
 		Expect(get(p, "", project)()).To(Succeed())
