@@ -115,6 +115,30 @@ func TestPhaseReasonBeforeControllerReports(t *testing.T) {
 	}
 }
 
+// A pod the project quota refuses is a reconcile error the user can fix by
+// freeing quota, so its reason says quota, not the controller.
+func TestPhaseReasonQuotaExceeded(t *testing.T) {
+	ready := func(reason, message string) *Sandbox {
+		return &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
+			{Type: ConditionReady, Status: metav1.ConditionFalse, Reason: reason, Message: message},
+		}}}
+	}
+	quota := `Error seen: pods "qa-sb" is forbidden: exceeded quota: forgeai-quota, requested: requests.memory=2Gi`
+	sb := ready(ReasonReconcilerError, quota)
+	if got := PhaseReason(sb); got != ReasonQuotaExceeded {
+		t.Errorf("PhaseReason(quota refusal) = %q, want %q", got, ReasonQuotaExceeded)
+	}
+	if phase, _ := PhaseOf(sb); phase != PhaseFailed {
+		t.Errorf("PhaseOf(quota refusal) = %s, want Failed", phase)
+	}
+	if got := PhaseReason(ready(ReasonReconcilerError, "Error seen: unknown")); got != ReasonReconcilerError {
+		t.Errorf("PhaseReason(other reconcile error) = %q, want %q", got, ReasonReconcilerError)
+	}
+	if got := PhaseReason(ready(ReasonPodFailed, quota)); got != ReasonPodFailed {
+		t.Errorf("PhaseReason(pod failed mentioning quota) = %q, want %q", got, ReasonPodFailed)
+	}
+}
+
 func TestIsSandboxPaused(t *testing.T) {
 	if IsSandboxPaused(&Sandbox{}) {
 		t.Error("a new sandbox reads as paused")

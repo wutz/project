@@ -42,6 +42,14 @@ func Condition(sb *Sandbox, t string) *metav1.Condition {
 // not reported a Ready condition yet. It is set here, not by the controller.
 const ReasonAwaitingController = "AwaitingController"
 
+// ReasonQuotaExceeded is the PhaseReason of a sandbox whose pod the project quota
+// refuses. The controller reports the refusal as a reconcile error, so the
+// reason is read from its message, and the sandbox starts again once quota frees.
+const ReasonQuotaExceeded = "QuotaExceeded"
+
+// quotaRefusal is how the API server words a quota refusal in that message.
+const quotaRefusal = "exceeded quota:"
+
 // PhaseOf derives the phase from the sandbox status conditions.
 func PhaseOf(sb *Sandbox) (Phase, string) {
 	if sb == nil {
@@ -91,6 +99,9 @@ func PhaseReason(sb *Sandbox) string {
 		return ""
 	case ready.Status == metav1.ConditionTrue:
 		return ""
+	}
+	if ready.Reason == ReasonReconcilerError && strings.Contains(ready.Message, quotaRefusal) {
+		return ReasonQuotaExceeded
 	}
 	return ready.Reason
 }
