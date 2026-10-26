@@ -465,3 +465,12 @@ func (l *Loader) Get(ctx context.Context) (*Config, error) {
 	l.cfg, l.time = cfg, time.Now()
 	return cfg, nil
 }
+
+// Invalidate drops the cached config, so that the next Get reads the
+// ConfigMap again. Controllers call it when the ConfigMap changes, so that a
+// change takes effect at once instead of after the cache expires.
+func (l *Loader) Invalidate() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.cfg = nil
+}

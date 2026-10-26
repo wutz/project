@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -342,6 +343,52 @@ var _ = Describe("forgeai operator", Ordered, func() {
 			_ = get(dep, ns, name)()
 			return *dep.Spec.Replicas
 		}, timeout, interval).Should(Equal(int32(1)))
+	})
+
+	It("fails a file server without an ingress domain and recovers when it is set", func() {
+		fs := &v1.FileServer{ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: ns}}
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fs))).To(Succeed())
+		key := client.ObjectKey{Namespace: configNamespace, Name: platform.ConfigMapName}
+		setConfig := func(data string) {
+			cm := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
+			cm.Data[platform.ConfigKey] = data
+			Expect(k8sClient.Update(ctx, cm)).To(Succeed())
+		}
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
+		original := cm.Data[platform.ConfigKey]
+		DeferCleanup(setConfig, original)
+
+		ingress := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "forgeai-files-default", Namespace: ns}}
+		setConfig(strings.Replace(original, "domain: example.com", `domain: ""`, 1))
+		Eventually(func() v1.FileServerPhase {
+			_ = get(fs, ns, fs.Name)()
+			return fs.Status.Phase
+		}, timeout, interval).Should(Equal(v1.FileServerFailed))
+		Expect(fs.Status.URL).To(BeEmpty())
+		Eventually(func() string {
+			_ = get(fs, ns, fs.Name)()
+			if c := meta.FindStatusCondition(fs.Status.Conditions, "Ready"); c != nil {
+				return c.Message
+			}
+			return ""
+		}, timeout, interval).Should(ContainSubstring("ingress.domain"))
+		// No Ingress is applied for an empty host: drop the one the earlier
+		// specs left and make sure nothing re-applies it. A reconcile that
+		// started with the old config may recreate it once, so wait for the
+		// Failed phase first.
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, ingress))).To(Succeed())
+		Consistently(func() bool {
+			return apierrors.IsNotFound(get(ingress, ns, ingress.Name)())
+		}, 2*time.Second, interval).Should(BeTrue())
+
+		setConfig(original)
+		Eventually(func() v1.FileServerPhase {
+			_ = get(fs, ns, fs.Name)()
+			return fs.Status.Phase
+		}, timeout, interval).Should(Equal(v1.FileServerIdle))
+		Expect(fs.Status.URL).To(Equal("https://files-forge-demo.example.com:7443"))
 	})
 
 	It("releases a trashed volume from the file server", func() {

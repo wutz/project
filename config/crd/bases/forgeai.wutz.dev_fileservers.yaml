@@ -142,6 +142,7 @@ spec:
                 - Idle
                 - Starting
                 - Ready
+                - Failed
                 type: string
               secret:
                 description: secret holds the basic auth username and password.

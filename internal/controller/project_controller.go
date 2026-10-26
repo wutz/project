@@ -703,7 +703,7 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	managed := builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 		return o.GetLabels()[naming.LabelProject] != ""
 	}))
-	allProjects := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+	projectRequests := func(ctx context.Context) []reconcile.Request {
 		list := &v1.ProjectList{}
 		if err := mgr.GetClient().List(ctx, list); err != nil {
 			return nil
@@ -713,6 +713,15 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			out = append(out, reconcile.Request{NamespacedName: types.NamespacedName{Name: p.Name}})
 		}
 		return out
+	}
+	allProjects := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+		return projectRequests(ctx)
+	})
+	// A changed platform config is read again before the projects reconcile,
+	// not after the loader's cache expires.
+	platformConfigChanged := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+		r.Config.Invalidate()
+		return projectRequests(ctx)
 	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Project{}).
@@ -731,7 +740,7 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// documents ownership and keeps quotas in sync on changes).
 		Watches(projectSandboxObject(), byProjectLabel, managed).
 		// Project namespaces carry a copy of the platform config.
-		Watches(&corev1.ConfigMap{}, allProjects, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
+		Watches(&corev1.ConfigMap{}, platformConfigChanged, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			return o.GetNamespace() == r.Config.Namespace && o.GetName() == platform.ConfigMapName
 		}))).
 		Named("project").
