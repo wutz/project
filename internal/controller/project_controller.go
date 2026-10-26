@@ -229,6 +229,9 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 			return err
 		}
 	}
+	if err := apply(ctx, r.Client, cpuResourceFlavor()); err != nil {
+		return fmt.Errorf("apply CPU ResourceFlavor: %w", err)
+	}
 	if err := apply(ctx, r.Client, clusterQueue(p, cfg, ns, classes)); err != nil {
 		return fmt.Errorf("apply ClusterQueue: %w", err)
 	}
@@ -437,28 +440,49 @@ func toAny(m map[string]string) map[string]any {
 	return out
 }
 
+// cpuFlavor is the ResourceFlavor of workloads that request no GPU. It has no
+// node labels, so those pods run on any node.
+const cpuFlavor = "cpu"
+
+func cpuResourceFlavor() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{Object: map[string]any{
+		naming.KeyMetadata: map[string]any{
+			naming.KeyName:   naming.ResourceFlavor(cpuFlavor),
+			naming.KeyLabels: map[string]any{naming.LabelManagedBy: naming.ManagedBy},
+		},
+	}}
+	u.SetGroupVersionKind(kf.ResourceFlavorGVK)
+	return u
+}
+
+// flavor is one ResourceFlavor entry of a ClusterQueue resource group.
+func flavor(name string, milliCPU, memory, gpus int64) map[string]any {
+	return map[string]any{
+		naming.KeyName: name,
+		"resources": []any{
+			map[string]any{naming.KeyName: "cpu", keyNominalQuota: resource.NewMilliQuantity(milliCPU, resource.DecimalSI).String()},
+			map[string]any{naming.KeyName: "memory", keyNominalQuota: resource.NewQuantity(memory, resource.BinarySI).String()},
+			map[string]any{naming.KeyName: string(instancetype.ResourceGPU), keyNominalQuota: fmt.Sprint(gpus)},
+		},
+	}
+}
+
 // clusterQueue is the project's Kueue ClusterQueue: one ResourceFlavor per
-// GPU class, with CPU and memory quota following the per-GPU slice.
+// GPU class, with CPU and memory quota following the per-GPU slice. The CPU
+// flavor comes last and holds the headroom, so workloads without a GPU are
+// admitted even when the project has no GPU quota or the cluster has no GPUs.
 func clusterQueue(p *v1.Project, cfg *platform.Config, ns string, classes []instancetype.Class) *unstructured.Unstructured {
-	flavors := make([]any, 0, len(classes))
+	flavors := make([]any, 0, len(classes)+1)
 	for _, c := range classes {
 		n := gpuQuota(p, cfg, c.Name)
-		flavors = append(flavors, map[string]any{
-			naming.KeyName: naming.ResourceFlavor(c.Name),
-			"resources": []any{
-				map[string]any{naming.KeyName: "cpu", keyNominalQuota: resource.NewMilliQuantity(n*c.MilliCPU, resource.DecimalSI).String()},
-				map[string]any{naming.KeyName: "memory", keyNominalQuota: resource.NewQuantity(n*c.Memory, resource.BinarySI).String()},
-				map[string]any{naming.KeyName: string(instancetype.ResourceGPU), keyNominalQuota: fmt.Sprint(n)},
-			},
-		})
+		flavors = append(flavors, flavor(naming.ResourceFlavor(c.Name), n*c.MilliCPU, n*c.Memory, n))
 	}
-	groups := []any{}
-	if len(flavors) > 0 {
-		groups = append(groups, map[string]any{
-			"coveredResources": []any{"cpu", "memory", string(instancetype.ResourceGPU)},
-			"flavors":          flavors,
-		})
-	}
+	headroom := cfg.DefaultQuota.Headroom
+	flavors = append(flavors, flavor(naming.ResourceFlavor(cpuFlavor), headroom.CPU.MilliValue(), headroom.Memory.Value(), 0))
+	groups := []any{map[string]any{
+		"coveredResources": []any{"cpu", "memory", string(instancetype.ResourceGPU)},
+		"flavors":          flavors,
+	}}
 	u := &unstructured.Unstructured{Object: map[string]any{
 		naming.KeyMetadata: map[string]any{
 			naming.KeyName: naming.ClusterQueue(ns), naming.KeyLabels: toAny(projectLabels(p)),

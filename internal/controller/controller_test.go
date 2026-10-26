@@ -177,6 +177,10 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Expect(get(cq, "", ns)()).To(Succeed())
 		flavors, _, _ := unstructured.NestedSlice(cq.Object, "spec", "resourceGroups")
 		Expect(fmt.Sprint(flavors)).To(ContainSubstring("forgeai-rtx-5090"))
+		Expect(fmt.Sprint(flavors)).To(ContainSubstring(naming.ResourceFlavor("cpu")))
+		cpuFlavor := &unstructured.Unstructured{}
+		cpuFlavor.SetGroupVersionKind(kf.ResourceFlavorGVK)
+		Expect(get(cpuFlavor, "", naming.ResourceFlavor("cpu"))()).To(Succeed())
 		lq := &unstructured.Unstructured{}
 		lq.SetGroupVersionKind(kf.LocalQueueGVK)
 		Expect(get(lq, ns, "default")()).To(Succeed())
