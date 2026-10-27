@@ -25,14 +25,12 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -43,12 +41,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/internal/controller"
-	"github.com/wutz/forgeai/pkg/naming"
-	"github.com/wutz/forgeai/pkg/platform"
-	"github.com/wutz/forgeai/pkg/sandbox"
-	"github.com/wutz/forgeai/pkg/sshgateway"
+	forgeaiv1alpha1 "github.com/wutz/project-operator/api/v1alpha1"
+	"github.com/wutz/project-operator/internal/controller"
+	"github.com/wutz/project-operator/pkg/naming"
+	"github.com/wutz/project-operator/pkg/platform"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -170,9 +166,8 @@ func main() {
 		metricsServerOptions.KeyName = metricsCertKey
 	}
 
-	// Cache only the forgeai-managed instances of high-volume or sensitive
-	// kinds; pods, PVCs, nodes and namespaces are cached in full because
-	// instance availability and the volume trash need all of them.
+	// Cache only the project-managed instances of high-volume or sensitive
+	// kinds; the project controller reads everything else through the cache.
 	managed := cache.ByObject{Label: labels.SelectorFromSet(labels.Set{naming.LabelManagedBy: naming.ManagedBy})}
 	platformNS := cache.ByObject{Namespaces: map[string]cache.Config{platform.Namespace(): {}}}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -184,11 +179,8 @@ func main() {
 				&corev1.ServiceAccount{}:      managed,
 				&corev1.ResourceQuota{}:       managed,
 				&corev1.LimitRange{}:          managed,
-				&corev1.Service{}:             managed,
 				&corev1.ConfigMap{}:           platformNS,
-				&appsv1.Deployment{}:          managed,
 				&networkingv1.NetworkPolicy{}: managed,
-				&networkingv1.Ingress{}:       managed,
 				&rbacv1.RoleBinding{}:         managed,
 			},
 		},
@@ -197,7 +189,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "9426cee7.wutz.dev",
+		LeaderElectionID:       "project-operator.wutz.dev",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -216,11 +208,6 @@ func main() {
 	}
 
 	cfg := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: platform.Namespace()}
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "Failed to create clientset")
-		os.Exit(1)
-	}
 	for name, r := range map[string]interface{ SetupWithManager(ctrl.Manager) error }{
 		"project": &controller.ProjectReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: cfg,
@@ -228,63 +215,9 @@ func main() {
 		"registry": &controller.RegistryReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
 		},
-		"instancetype": &controller.InstanceTypeReconciler{Client: mgr.GetClient(), Config: cfg},
-		"fileserver": &controller.FileServerReconciler{
-			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg, Activity: controller.LogActivity(clientset),
-		},
-		"volume-trash": &controller.PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: cfg},
-		"inferenceservice": &controller.InferenceServiceReconciler{
-			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg,
-		},
-		"trainjob": &controller.TrainJobReconciler{
-			Client: mgr.GetClient(), Config: cfg, Recorder: mgr.GetEventRecorder("forgeai-trainjob"),
-		},
 	} {
 		if err := r.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "Failed to create controller", "controller", name)
-			os.Exit(1)
-		}
-	}
-	// agent-sandbox is optional: without its CRDs the rest of forgeai still
-	// runs, and the Sandbox controller is registered once they are installed.
-	// The Gateway API is optional too: without HTTPRoutes sandboxes are not
-	// published through the gateway.
-	gvk := sandbox.SandboxGVK
-	if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
-		setupLog.Info("agent-sandbox CRDs are not installed; the Sandbox controller is off")
-	} else {
-		routes := false
-		if _, err := mgr.GetRESTMapper().RESTMapping(sandbox.HTTPRouteGVK.GroupKind(), sandbox.HTTPRouteGVK.Version); err != nil {
-			setupLog.Info("Gateway API HTTPRoute CRD is not installed; sandboxes are not published through the gateway")
-		} else {
-			routes = true
-		}
-		if err := (&controller.SandboxReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, Gateway: routes,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create controller", "controller", "sandbox")
-			os.Exit(1)
-		}
-	}
-	// The SSH gateway is optional too: its routing table is sshpiper Pipes, so
-	// without the sshpiper CRD the gateway and route controllers stay off.
-	pipeGVK := sshgateway.PipeGVK
-	if _, err := mgr.GetRESTMapper().RESTMapping(pipeGVK.GroupKind(), pipeGVK.Version); err != nil {
-		setupLog.Info("sshpiper Pipe CRD is not installed; the SSH gateway controllers are off")
-	} else {
-		if err := (&controller.SSHGatewayReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-			Config: cfg,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create controller", "controller", "sshgateway")
-			os.Exit(1)
-		}
-		if err := (&controller.SSHRouteReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create controller", "controller", "sshroute")
 			os.Exit(1)
 		}
 	}

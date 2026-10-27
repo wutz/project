@@ -22,23 +22,8 @@ resources:
 - project_roles.yaml
 # For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
 # default, aiding admins in cluster management. Those roles are
-# not used by the forgeai itself. You can comment the following lines
+# not used by the operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- sshroute_admin_role.yaml
-- sshroute_editor_role.yaml
-- sshroute_viewer_role.yaml
-- sshgateway_admin_role.yaml
-- sshgateway_editor_role.yaml
-- sshgateway_viewer_role.yaml
-- sshgatewayclass_admin_role.yaml
-- sshgatewayclass_editor_role.yaml
-- sshgatewayclass_viewer_role.yaml
-- fileserver_admin_role.yaml
-- fileserver_editor_role.yaml
-- fileserver_viewer_role.yaml
-- instancetype_admin_role.yaml
-- instancetype_editor_role.yaml
-- instancetype_viewer_role.yaml
 - project_admin_role.yaml
 - project_editor_role.yaml
 - project_viewer_role.yaml

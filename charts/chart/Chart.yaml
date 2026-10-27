@@ -1,9 +1,9 @@
 apiVersion: v2
-name: forgeai
-description: The forgeai operator - projects, instance types and file servers for a Kubernetes-native AI platform
-home: https://github.com/wutz/forgeai
+name: project-operator
+description: The project operator - Project namespaces with quota, network isolation, Kueue queues, members and registries for forgeai
+home: https://github.com/wutz/project-operator
 sources:
-  - https://github.com/wutz/forgeai
+  - https://github.com/wutz/project-operator
 type: application
 
 version: 0.4.0

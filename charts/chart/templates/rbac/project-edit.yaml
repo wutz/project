@@ -8,7 +8,7 @@ metadata:
 {{- if .Values.rbac.namespaced }}
   namespace: {{ .Release.Namespace }}
 {{- end }}
-  name: {{ include "forgeai.resourceName" (dict "suffix" "project-edit" "context" $) }}
+  name: {{ include "project-operator.resourceName" (dict "suffix" "project-edit" "context" $) }}
 rules:
 - apiGroups:
   - ""

@@ -3,12 +3,6 @@
 # It should be run by config/default
 resources:
 - bases/forgeai.wutz.dev_projects.yaml
-- bases/forgeai.wutz.dev_instancetypes.yaml
-- bases/forgeai.wutz.dev_fileservers.yaml
-- bases/forgeai.wutz.dev_inferenceservices.yaml
-- bases/forgeai.wutz.dev_sshgatewayclasses.yaml
-- bases/forgeai.wutz.dev_sshgateways.yaml
-- bases/forgeai.wutz.dev_sshroutes.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

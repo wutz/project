@@ -11,10 +11,10 @@ metadata:
 {{- end }}
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/name: {{ include "forgeai.name" . }}
+    app.kubernetes.io/name: {{ include "project-operator.name" . }}
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  name: {{ include "forgeai.resourceName" (dict "suffix" "project-admin-role" "context" $) }}
+  name: {{ include "project-operator.resourceName" (dict "suffix" "project-admin-role" "context" $) }}
 rules:
 - apiGroups:
   - forgeai.wutz.dev

@@ -10,8 +10,8 @@ plugins:
   helm.kubebuilder.io/v2-alpha:
     manifests: dist/install.yaml
     output: charts
-projectName: forgeai
-repo: github.com/wutz/forgeai
+projectName: project-operator
+repo: github.com/wutz/project-operator
 resources:
 - api:
     crdVersion: v1
@@ -19,54 +19,6 @@ resources:
   domain: wutz.dev
   group: forgeai
   kind: Project
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: wutz.dev
-  group: forgeai
-  kind: InstanceType
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: wutz.dev
-  group: forgeai
-  kind: FileServer
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- controller: true
-  core: true
-  group: core
-  kind: PersistentVolumeClaim
-  path: k8s.io/api/core/v1
-  version: v1
-- api:
-    crdVersion: v1
-  domain: wutz.dev
-  group: forgeai
-  kind: SSHGatewayClass
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: wutz.dev
-  group: forgeai
-  kind: SSHGateway
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: wutz.dev
-  group: forgeai
-  kind: SSHRoute
-  path: github.com/wutz/forgeai/api/v1alpha1
+  path: github.com/wutz/project-operator/api/v1alpha1
   version: v1alpha1
 version: "3"
