@@ -1,0 +1,35 @@
+name: Test chart
+
+# Lints the Helm chart in charts/chart and renders it, so a template error
+# fails the pull request instead of the release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+      - "Makefile"
+      - ".github/workflows/test-chart.yml"
+  pull_request:
+    paths:
+      - "charts/**"
+      - "Makefile"
+      - ".github/workflows/test-chart.yml"
+
+permissions: {}
+
+jobs:
+  lint:
+    name: Lint and render
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint and render the chart
+        run: make helm-lint
