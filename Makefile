@@ -69,7 +69,7 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # - KUBECTL_KUBERC=true
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= forgeai-test-e2e
+KIND_CLUSTER ?= project-operator-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -129,18 +129,6 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-# SSHD_IMG is the sshd sidecar of SSH sandboxes; the platform's sandbox.sshImage
-# must name the same image.
-SSHD_IMG ?= ghcr.io/wutz/forgeai-sshd:0.1.0
-
-.PHONY: sshd-image
-sshd-image: ## Build the sshd sidecar image of SSH sandboxes.
-	$(CONTAINER_TOOL) build -t ${SSHD_IMG} images/sshd
-
-.PHONY: sshd-push
-sshd-push: ## Push the sshd sidecar image of SSH sandboxes.
-	$(CONTAINER_TOOL) push ${SSHD_IMG}
-
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
@@ -152,10 +140,10 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name forgeai-builder
-	$(CONTAINER_TOOL) buildx use forgeai-builder
+	- $(CONTAINER_TOOL) buildx create --name project-operator-builder
+	$(CONTAINER_TOOL) buildx use project-operator-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm forgeai-builder
+	- $(CONTAINER_TOOL) buildx rm project-operator-builder
 	rm Dockerfile.cross
 
 .PHONY: build-installer
@@ -188,37 +176,6 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
-
-##@ Dev cluster (ko)
-
-KO ?= ko
-KO_DOCKER_REPO ?= ghcr.io/wutz/forgeai
-KO_PLATFORMS ?= linux/amd64
-
-.PHONY: render-dev
-render-dev: manifests kustomize ## Build images with ko and render deploy/dev to dist/dev.yaml.
-	mkdir -p dist
-	"$(KUSTOMIZE)" build deploy/dev | KO_DOCKER_REPO=$(KO_DOCKER_REPO) $(KO) resolve -B --sbom=none --platform=$(KO_PLATFORMS) -f - > dist/dev.yaml
-
-.PHONY: deploy-dev
-deploy-dev: render-dev ## Build images with ko and deploy to the current kube context.
-	"$(KUBECTL)" apply --server-side -f dist/dev.yaml
-
-.PHONY: undeploy-dev
-undeploy-dev: kustomize ## Remove the dev deployment (deletes the CRDs and all forgeai objects).
-	"$(KUSTOMIZE)" build deploy/dev | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
-
-.PHONY: gui
-gui: ## Build the Wails desktop client (gui/build/bin).
-	cd gui && wails build -clean
-
-.PHONY: gui-dev
-gui-dev: ## Run the Wails dev server without breaking the packaged app (see hack/gui-dev.sh).
-	./hack/gui-dev.sh $(GUI_DEV_ARGS)
-
-.PHONY: gui-deps
-gui-deps: kustomize ## Regenerate the cluster dependency manifests embedded in the GUI (gui/app/deps).
-	KUSTOMIZE="$(KUSTOMIZE)" ./hack/gui-deps.sh
 
 ##@ Dependencies
 
@@ -307,9 +264,9 @@ endef
 ## Helm binary to use for deploying the chart
 HELM ?= helm
 ## Namespace to deploy the Helm release
-HELM_NAMESPACE ?= forgeai-system
+HELM_NAMESPACE ?= project-operator-system
 ## Name of the Helm release
-HELM_RELEASE ?= forgeai
+HELM_RELEASE ?= project-operator
 ## Path to the Helm chart directory
 HELM_CHART_DIR ?= charts/chart
 ## Additional arguments to pass to helm commands
@@ -355,10 +312,9 @@ HELM_OCI_REPO ?= oci://ghcr.io/wutz/charts
 CHART_VERSION ?=
 
 .PHONY: helm-lint
-helm-lint: install-helm ## Lint the Helm chart and render it with the default values and a platform config.
+helm-lint: install-helm ## Lint the Helm chart and render it with the default values.
 	$(HELM) lint $(HELM_CHART_DIR)
-	$(HELM) template forgeai $(HELM_CHART_DIR) --namespace $(HELM_NAMESPACE) >/dev/null
-	$(HELM) template forgeai $(HELM_CHART_DIR) --namespace $(HELM_NAMESPACE) --set platform.config.namespacePrefix=forge- >/dev/null
+	$(HELM) template $(HELM_RELEASE) $(HELM_CHART_DIR) --namespace $(HELM_NAMESPACE) >/dev/null
 
 .PHONY: helm-package
 helm-package: install-helm ## Package the Helm chart into dist/. CHART_VERSION sets the chart and app version.
@@ -367,6 +323,6 @@ helm-package: install-helm ## Package the Helm chart into dist/. CHART_VERSION s
 		$(if $(CHART_VERSION),--version $(CHART_VERSION) --app-version $(CHART_VERSION))
 
 .PHONY: helm-push
-helm-push: install-helm ## Push dist/forgeai-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
+helm-push: install-helm ## Push dist/project-operator-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
 	@test -n "$(CHART_VERSION)" || { echo "CHART_VERSION is required"; exit 1; }
-	$(HELM) push dist/forgeai-$(CHART_VERSION).tgz $(HELM_OCI_REPO)
+	$(HELM) push dist/project-operator-$(CHART_VERSION).tgz $(HELM_OCI_REPO)

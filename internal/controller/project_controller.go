@@ -44,12 +44,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/instancetype"
-	"github.com/wutz/forgeai/pkg/kf"
-	"github.com/wutz/forgeai/pkg/naming"
-	"github.com/wutz/forgeai/pkg/platform"
-	"github.com/wutz/forgeai/pkg/sandbox"
+	v1 "github.com/wutz/project-operator/api/v1alpha1"
+	"github.com/wutz/project-operator/pkg/instancetype"
+	"github.com/wutz/project-operator/pkg/kf"
+	"github.com/wutz/project-operator/pkg/naming"
+	"github.com/wutz/project-operator/pkg/platform"
+	"github.com/wutz/project-operator/pkg/sandbox"
 )
 
 const (
@@ -83,18 +83,6 @@ type ProjectReconciler struct {
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // The member roles bound by the operator (it may only grant what it holds):
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=pods;pods/log;events;configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=get;list;watch
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs;trainingruntimes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads,verbs=get;list;watch
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=fileservers,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes/status,verbs=get
-// +kubebuilder:rbac:groups=extensions.agents.x-k8s.io,resources=sandboxtemplates;sandboxclaims;sandboxwarmpools,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
 
 func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -278,24 +266,37 @@ func (r *ProjectReconciler) platformConfig(ctx context.Context, p *v1.Project, n
 
 // gpuClasses returns the GPU classes and their per-GPU slice from the InstanceTypes.
 func (r *ProjectReconciler) gpuClasses(ctx context.Context) ([]instancetype.Class, error) {
-	list := &v1.InstanceTypeList{}
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(instancetype.GVK.GroupVersion().WithKind(instancetype.GVK.Kind + "List"))
 	if err := r.List(ctx, list); err != nil {
 		return nil, err
 	}
 	byName := map[string]*instancetype.Class{}
 	for _, it := range list.Items {
-		g := it.Spec.GPU
-		if g.Count < 1 {
+		class, _, _ := unstructured.NestedString(it.Object, "spec", "gpu", "class")
+		product, _, _ := unstructured.NestedString(it.Object, "spec", "gpu", "product")
+		count, _, _ := unstructured.NestedInt64(it.Object, "spec", "gpu", "count")
+		if count < 1 {
 			continue
 		}
-		c := byName[g.Class]
-		if c == nil {
-			c = &instancetype.Class{Name: g.Class, Product: g.Product}
-			byName[g.Class] = c
+		cpuText, _, _ := unstructured.NestedString(it.Object, "spec", "cpu")
+		memText, _, _ := unstructured.NestedString(it.Object, "spec", "memory")
+		cpu, err := resource.ParseQuantity(cpuText)
+		if err != nil {
+			return nil, fmt.Errorf("InstanceType %s cpu: %w", it.GetName(), err)
 		}
-		if g.Count == 1 || c.MilliCPU == 0 {
-			c.MilliCPU = it.Spec.CPU.MilliValue() / int64(g.Count)
-			c.Memory = it.Spec.Memory.Value() / int64(g.Count)
+		mem, err := resource.ParseQuantity(memText)
+		if err != nil {
+			return nil, fmt.Errorf("InstanceType %s memory: %w", it.GetName(), err)
+		}
+		c := byName[class]
+		if c == nil {
+			c = &instancetype.Class{Name: class, Product: product}
+			byName[class] = c
+		}
+		if count == 1 || c.MilliCPU == 0 {
+			c.MilliCPU = cpu.MilliValue() / count
+			c.Memory = mem.Value() / count
 		}
 	}
 	out := make([]instancetype.Class, 0, len(byName))
@@ -734,11 +735,7 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(lq, byProjectLabel, managed).
 		Watches(cq, byProjectLabel, managed).
 		// Quotas follow the GPU classes and their slices.
-		Watches(&v1.InstanceType{}, allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		// Agent sandboxes carry the project label, so a new one is a new
-		// member of the project (nothing to reconcile yet, but the watch
-		// documents ownership and keeps quotas in sync on changes).
-		Watches(projectSandboxObject(), byProjectLabel, managed).
+		Watches(instanceTypeObject(), allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		// Project namespaces carry a copy of the platform config.
 		Watches(&corev1.ConfigMap{}, platformConfigChanged, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			return o.GetNamespace() == r.Config.Namespace && o.GetName() == platform.ConfigMapName
@@ -747,10 +744,10 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// projectSandboxObject is an empty Sandbox for the project controller's watch.
-func projectSandboxObject() *unstructured.Unstructured {
+// instanceTypeObject is an empty InstanceType for the project controller's watch.
+func instanceTypeObject() *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
-	u.SetGroupVersionKind(sandbox.SandboxGVK)
+	u.SetGroupVersionKind(instancetype.GVK)
 	return u
 }
 

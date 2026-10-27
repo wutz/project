@@ -8,64 +8,21 @@ rules:
   - ""
   resources:
   - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - limitranges
   - namespaces
-  - persistentvolumeclaims
   - resourcequotas
   - secrets
   - serviceaccounts
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  - pods
-  - pods/log
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  - events.k8s.io
-  resources:
-  - events
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
-  - agents.x-k8s.io
-  resources:
-  - sandboxes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - agents.x-k8s.io
-  resources:
-  - sandboxes/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
-  - deployments
   verbs:
   - create
   - delete
@@ -82,35 +39,17 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - extensions.agents.x-k8s.io
-  resources:
-  - sandboxclaims
-  - sandboxtemplates
-  - sandboxwarmpools
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - forgeai.wutz.dev
   resources:
-  - fileservers
-  - inferenceservices
   - instancetypes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - forgeai.wutz.dev
+  resources:
   - projects
-  - sshgateways
   verbs:
   - create
   - delete
@@ -122,73 +61,22 @@ rules:
 - apiGroups:
   - forgeai.wutz.dev
   resources:
-  - fileservers/finalizers
-  - inferenceservices/finalizers
   - projects/finalizers
-  - sshgateways/finalizers
-  - sshroutes/finalizers
   verbs:
   - update
 - apiGroups:
   - forgeai.wutz.dev
   resources:
-  - fileservers/status
-  - inferenceservices/status
-  - instancetypes/status
   - projects/status
-  - sshgateways/status
-  - sshroutes/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - forgeai.wutz.dev
-  resources:
-  - sshgatewayclasses
-  - sshroutes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - gateway.networking.k8s.io
-  resources:
-  - httproutes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - inference.networking.k8s.io
-  resources:
-  - inferencepools
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - jobset.x-k8s.io
-  resources:
-  - jobsets
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - kueue.x-k8s.io
   resources:
   - clusterqueues
   - localqueues
-  - resourceflavors
   verbs:
   - create
   - delete
@@ -200,18 +88,7 @@ rules:
 - apiGroups:
   - kueue.x-k8s.io
   resources:
-  - workloads
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - llm-d.ai
-  resources:
-  - inferencemodelrewrites
-  - inferenceobjectives
+  - resourceflavors
   verbs:
   - get
   - list
@@ -219,7 +96,6 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
-  - ingresses
   - networkpolicies
   verbs:
   - create
@@ -241,39 +117,6 @@ rules:
   - create
   - delete
   - escalate
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - sshpiper.com
-  resources:
-  - pipes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - clustertrainingruntimes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - trainingruntimes
-  - trainjobs
-  verbs:
-  - create
-  - delete
   - get
   - list
   - patch

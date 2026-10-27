@@ -17,7 +17,7 @@ manager:
 
   image:
     # Published by .github/workflows/helm-release.yml for every release tag.
-    repository: ghcr.io/wutz/forgeai
+    repository: ghcr.io/wutz/project-operator
     ## Image tag (defaults to Chart.appVersion if not set)
     ##
     # tag: ""
@@ -111,18 +111,6 @@ manager:
   # pod:
   #   labels: {}
   #   annotations: {}
-
-## Platform configuration, rendered into the ConfigMap forgeai-system/forgeai-platform
-## (key config.yaml) that the operator reads. Leave empty to keep the ConfigMap
-## managed outside the chart (the operator then runs with the platform defaults).
-## See pkg/platform/config.go for the fields and deploy/dev/platform/config.yaml for an example.
-##
-platform:
-  config: {}
-  # config:
-  #   namespacePrefix: forge-
-  #   ingress:
-  #     domain: example.com
 
 ## RBAC configuration
 ##

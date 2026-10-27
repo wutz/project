@@ -20,9 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/harbor"
-	"github.com/wutz/forgeai/pkg/harbor/harbortest"
-	"github.com/wutz/forgeai/pkg/platform"
+	forgeaiv1alpha1 "github.com/wutz/project-operator/api/v1alpha1"
+	"github.com/wutz/project-operator/pkg/harbor"
+	"github.com/wutz/project-operator/pkg/harbor/harbortest"
+	"github.com/wutz/project-operator/pkg/platform"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -80,20 +78,7 @@ var (
 	cfg        *rest.Config
 	k8sClient  client.Client
 	fakeHarbor *harbortest.Server
-	activity   = &fakeActivity{}
 )
-
-// fakeActivity stands in for reading the dufs access log.
-type fakeActivity struct {
-	mu sync.Mutex
-	t  time.Time
-}
-
-func (f *fakeActivity) get(context.Context, string, string, time.Time) (time.Time, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.t, nil
-}
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -114,7 +99,7 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			// Trainer and Kueue CRDs exported from the dev cluster.
+			// Kueue CRDs, and the InstanceType CRD the forgeai operator owns, exported from the dev cluster.
 			filepath.Join("testdata", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
@@ -156,14 +141,6 @@ var _ = BeforeSuite(func() {
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, ConfigNamespace: configNamespace,
 			NewHarbor: func(_ platform.Registry, u, p string) *harbor.Client { return harbor.New(fakeHarbor.URL, u, p, true) },
 		},
-		&InstanceTypeReconciler{Client: mgr.GetClient(), Config: loader},
-		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
-		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
-		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
-		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
-		&SandboxReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, Gateway: true},
-		&SSHGatewayReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
-		&SSHRouteReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 	} {
 		Expect(r.SetupWithManager(mgr)).To(Succeed())
 	}

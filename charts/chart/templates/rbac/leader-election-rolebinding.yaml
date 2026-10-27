@@ -3,16 +3,16 @@ kind: RoleBinding
 metadata:
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/name: {{ include "forgeai.name" . }}
+    app.kubernetes.io/name: {{ include "project-operator.name" . }}
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  name: {{ include "forgeai.resourceName" (dict "suffix" "leader-election-rolebinding" "context" $) }}
+  name: {{ include "project-operator.resourceName" (dict "suffix" "leader-election-rolebinding" "context" $) }}
   namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "forgeai.resourceName" (dict "suffix" "leader-election-role" "context" $) }}
+  name: {{ include "project-operator.resourceName" (dict "suffix" "leader-election-role" "context" $) }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "forgeai.serviceAccountName" . }}
+  name: {{ include "project-operator.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
