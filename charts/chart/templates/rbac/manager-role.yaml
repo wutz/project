@@ -83,6 +83,7 @@ rules:
   resources:
   - clusterqueues
   - localqueues
+  - resourceflavors
   verbs:
   - create
   - delete
@@ -90,14 +91,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
-  - resourceflavors
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - networking.k8s.io
