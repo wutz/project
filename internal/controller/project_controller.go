@@ -80,7 +80,7 @@ type ProjectReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=clusterqueues;localqueues,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // The member roles bound by the operator (it may only grant what it holds):
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
