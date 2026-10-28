@@ -1,5 +1,5 @@
 apiVersion: v2
-name: project
+name: workspace
 description: Project namespaces with quota, network isolation, Kueue queues (optional), members and registries, and GPU InstanceTypes derived from GPU nodes
 home: https://github.com/wutz/project
 sources:
