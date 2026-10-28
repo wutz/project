@@ -37,11 +37,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/instancetype"
-	"github.com/wutz/project/pkg/kf"
-	"github.com/wutz/project/pkg/naming"
-	"github.com/wutz/project/pkg/platform"
+	v1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/instancetype"
+	"github.com/wutz/workspace/pkg/kf"
+	"github.com/wutz/workspace/pkg/naming"
+	"github.com/wutz/workspace/pkg/platform"
 )
 
 // instanceTypeKey is the single reconcile request of the InstanceType

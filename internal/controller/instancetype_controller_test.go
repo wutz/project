@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/kf"
-	"github.com/wutz/project/pkg/naming"
+	v1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/kf"
+	"github.com/wutz/workspace/pkg/naming"
 )
 
 // createGPUNode adds a Ready node with eight GPUs of the same product.

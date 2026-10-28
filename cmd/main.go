@@ -43,10 +43,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	projectv1alpha1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/internal/controller"
-	"github.com/wutz/project/pkg/naming"
-	"github.com/wutz/project/pkg/platform"
+	projectv1alpha1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/internal/controller"
+	"github.com/wutz/workspace/pkg/naming"
+	"github.com/wutz/workspace/pkg/platform"
 	// +kubebuilder:scaffold:imports
 )
 

@@ -1,33 +1,33 @@
-# project
+# workspace
 
-A Kubernetes operator that turns a `Project` custom resource into an isolated
+A Kubernetes operator that turns a `Workspace` custom resource into an isolated
 workspace: a namespace with a GPU/CPU/memory quota, a Kueue queue, storage and
 pod limits, a network policy, and per-member access.
 
-The operator runs three controllers. The Project controller reconciles the
-`Project` API (`workspace.wutz.dev/v1alpha1`). The InstanceType controller derives one
+The operator runs three controllers. The Workspace controller reconciles the
+`Workspace` API (`workspace.wutz.dev/v1alpha1`). The InstanceType controller derives one
 `InstanceType` per GPU class and size from the GPU nodes and keeps its availability up to
-date. The registry controller gives each Project a Harbor project when the platform config
+date. The registry controller gives each Workspace a Harbor workspace when the platform config
 enables a registry.
 
-## What a Project creates
+## What a Workspace creates
 
-For each `Project` the operator reconciles:
+For each `Workspace` the operator reconciles:
 
-- A project namespace. The name prefix comes from the platform config.
+- A workspace namespace. The name prefix comes from the platform config.
 - A `ResourceQuota` derived from `spec.quota`. GPU quota is per GPU class; CPU and
   memory follow from the per-GPU slice of each `InstanceType`.
 - Kueue ClusterQueue and LocalQueue objects, only when the Kueue API is installed (see `--enable-kueue`).
 - A `NetworkPolicy` according to `spec.network`. `Isolated` admits traffic only from
-  the project and platform namespaces; `denyInternet` also blocks egress outside the project.
+  the workspace and platform namespaces; `denyInternet` also blocks egress outside the workspace.
 - For each entry in `spec.members`, a ServiceAccount in the platform members namespace
-  and a long-lived token Secret. The member's `edit` or `view` role is bound in the project namespace.
-- When a registry is configured, a Harbor project named after the Project.
+  and a long-lived token Secret. The member's `edit` or `view` role is bound in the workspace namespace.
+- When a registry is configured, a Harbor workspace named after the Workspace.
 
 `spec.deletionPolicy` decides whether the namespace (and its volumes) and the registry
 project are removed (`Delete`) or only access is revoked (`Retain`, the default).
 
-A minimal example, from [config/samples/project_v1alpha1_project.yaml](config/samples/project_v1alpha1_project.yaml):
+A minimal example, from [config/samples/workspace_v1alpha1_workspace.yaml](config/samples/workspace_v1alpha1_workspace.yaml):
 
 ```yaml
 apiVersion: workspace.wutz.dev/v1alpha1
@@ -73,9 +73,9 @@ spec:
 The chart is published as an OCI artifact and the image to GHCR. Both are public.
 
 ```bash
-helm install project oci://ghcr.io/wutz/charts/project \
+helm install workspace oci://ghcr.io/wutz/charts/workspace \
   --version 0.5.0 \
-  --namespace project-system
+  --namespace workspace-system
 ```
 
 The operator reads the platform ConfigMap from its own namespace, so the platform config
@@ -121,7 +121,7 @@ make test-e2e
 
 Pushing a `v*` tag runs `.github/workflows/helm-release.yml`. It publishes the
 container image to `ghcr.io/wutz/workspace` and the chart to
-`oci://ghcr.io/wutz/charts/project`, both tagged with the release version.
+`oci://ghcr.io/wutz/charts/workspace`, both tagged with the release version.
 
 ## License
 
