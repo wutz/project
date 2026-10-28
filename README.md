@@ -74,8 +74,10 @@ The chart is published as an OCI artifact and the image to GHCR. Both are public
 ```bash
 helm install project oci://ghcr.io/wutz/charts/project \
   --version 0.5.0 \
-  --namespace project-system --create-namespace
+  --namespace forgeai-system
 ```
+
+Install it into the forgeai namespace, next to forgeai. The operator reads the platform ConfigMap from its own namespace, so it must run where forgeai's `forgeai-platform` ConfigMap lives (`FORGEAI_NAMESPACE`, default `forgeai-system`).
 
 Override values with `--set` or a values file. Common settings:
 
