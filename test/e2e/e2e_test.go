@@ -30,20 +30,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/wutz/project-operator/test/utils"
+	"github.com/wutz/project/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "project-operator-system"
+const namespace = "project-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "project-operator-controller-manager"
+const serviceAccountName = "project-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "project-operator-controller-manager-metrics-service"
+const metricsServiceName = "project-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "project-operator-metrics-binding"
+const metricsRoleBindingName = "project-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -176,7 +176,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=project-operator-metrics-reader",
+				"--clusterrole=project-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)

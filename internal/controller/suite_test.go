@@ -36,26 +36,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	forgeaiv1alpha1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/pkg/harbor"
-	"github.com/wutz/project-operator/pkg/harbor/harbortest"
-	"github.com/wutz/project-operator/pkg/platform"
+	projectv1alpha1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/harbor"
+	"github.com/wutz/project/pkg/harbor/harbortest"
+	"github.com/wutz/project/pkg/platform"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const configNamespace = "forgeai-system"
+const configNamespace = "project-system"
 
 const testPlatformConfig = `
-namespacePrefix: forge-
-apiServer: https://api.example.com:6443
+namespacePrefix: project-
 ingress: {className: nginx, domain: example.com, port: 7443}
-gateway: {name: forgeai-sandbox, namespace: forgeai-system, scheme: http, port: 8080}
+gateway: {name: project-gateway, namespace: project-system, scheme: http, port: 8080}
 registry: {domain: cr.example.com:7443, adminSecret: harbor-admin}
-storageTypes:
-  shared: {storageClass: shared}
-defaultStorageType: shared
 instanceTypes:
   reserved: {cpu: "8", memory: 64Gi}
   sizes: [1, 2, 4, 8]
@@ -64,11 +60,6 @@ defaultQuota:
   storage: 1Ti
 network:
   systemNamespaces: [ingress-nginx]
-sandbox:
-  idleTimeout: 1h
-training:
-  stuckTimeout: 1s
-trashRetention: 1h
 `
 
 var (
@@ -92,14 +83,14 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	var err error
-	err = forgeaiv1alpha1.AddToScheme(scheme.Scheme)
+	err = projectv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			// Kueue CRDs, and the InstanceType CRD the forgeai operator owns, exported from the dev cluster.
+			// Kueue CRDs, and the InstanceType CRD this operator owns, exported from the dev cluster.
 			filepath.Join("testdata", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
@@ -136,7 +127,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	loader := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace}
 	for _, r := range []interface{ SetupWithManager(ctrl.Manager) error }{
-		&ProjectReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: loader},
+		&InstanceTypeReconciler{Client: mgr.GetClient(), Config: loader, Kueue: true},
+		&ProjectReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: loader, Kueue: true},
 		&RegistryReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, ConfigNamespace: configNamespace,
 			NewHarbor: func(_ platform.Registry, u, p string) *harbor.Client { return harbor.New(fakeHarbor.URL, u, p, true) },

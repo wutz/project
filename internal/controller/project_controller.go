@@ -44,17 +44,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/pkg/instancetype"
-	"github.com/wutz/project-operator/pkg/kf"
-	"github.com/wutz/project-operator/pkg/naming"
-	"github.com/wutz/project-operator/pkg/platform"
-	"github.com/wutz/project-operator/pkg/sandbox"
+	v1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
+	"github.com/wutz/project/pkg/kf"
+	"github.com/wutz/project/pkg/naming"
+	"github.com/wutz/project/pkg/platform"
+	"github.com/wutz/project/pkg/sandbox"
 )
 
 const (
-	fieldOwner       = client.FieldOwner("forgeai")
-	projectFinalizer = "forgeai.wutz.dev/project"
+	fieldOwner       = client.FieldOwner("project")
+	projectFinalizer = "project.wutz.dev/project"
 	kindClusterRole  = "ClusterRole"
 	keyNominalQuota  = "nominalQuota"
 	verbGet          = "get"
@@ -70,18 +70,21 @@ type ProjectReconciler struct {
 	APIReader client.Reader
 	Scheme    *runtime.Scheme
 	Config    *platform.Loader
+	// Kueue is false when the cluster has no Kueue API: no queues are kept
+	// and the ResourceQuota alone limits the project.
+	Kueue bool
 }
 
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/finalizers,verbs=update
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts;secrets;resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=clusterqueues;localqueues,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // The member roles bound by the operator (it may only grant what it holds):
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
 
@@ -149,7 +152,7 @@ func projectLabels(p *v1.Project) map[string]string {
 	return map[string]string{naming.LabelManagedBy: naming.ManagedBy, naming.LabelProject: p.Name}
 }
 
-// apply server-side applies obj (typed or unstructured) as the forgeai field owner.
+// apply server-side applies obj (typed or unstructured) as the project field owner.
 func apply(ctx context.Context, c client.Client, obj client.Object) error {
 	u := &unstructured.Unstructured{}
 	if uo, ok := obj.(*unstructured.Unstructured); ok {
@@ -201,7 +204,10 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 	if err != nil {
 		return err
 	}
-	objs := []client.Object{platformConfig, resourceQuota(p, cfg, ns, classes), limitRange(p, ns), localQueue(p, ns)}
+	objs := []client.Object{platformConfig, resourceQuota(p, cfg, ns, classes), limitRange(p, ns)}
+	if r.Kueue {
+		objs = append(objs, localQueue(p, ns))
+	}
 	if np := networkPolicy(p, cfg, ns); np != nil {
 		objs = append(objs, np)
 	}
@@ -217,14 +223,16 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 			return err
 		}
 	}
-	if err := apply(ctx, r.Client, cpuResourceFlavor()); err != nil {
-		return fmt.Errorf("apply CPU ResourceFlavor: %w", err)
+	if r.Kueue {
+		if err := apply(ctx, r.Client, cpuResourceFlavor()); err != nil {
+			return fmt.Errorf("apply CPU ResourceFlavor: %w", err)
+		}
+		if err := apply(ctx, r.Client, clusterQueue(p, cfg, ns, classes)); err != nil {
+			return fmt.Errorf("apply ClusterQueue: %w", err)
+		}
+		p.Status.ClusterQueue = naming.ClusterQueue(ns)
+		p.Status.LocalQueue = naming.LocalQueueName
 	}
-	if err := apply(ctx, r.Client, clusterQueue(p, cfg, ns, classes)); err != nil {
-		return fmt.Errorf("apply ClusterQueue: %w", err)
-	}
-	p.Status.ClusterQueue = naming.ClusterQueue(ns)
-	p.Status.LocalQueue = naming.LocalQueueName
 	return r.reconcileMembers(ctx, p, cfg, ns)
 }
 
@@ -248,9 +256,9 @@ func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, 
 }
 
 // platformConfig mirrors the platform ConfigMap into the project namespace:
-// members read it there (storage types, registry, training defaults) and
-// have no access to the platform namespace. It is read uncached so a change
-// is copied by the reconcile it triggers.
+// members read it there (ingress, registry, instance types) and have no
+// access to the platform namespace. It is read uncached so a change is copied
+// by the reconcile it triggers.
 func (r *ProjectReconciler) platformConfig(ctx context.Context, p *v1.Project, ns string) (*corev1.ConfigMap, error) {
 	src := &corev1.ConfigMap{}
 	key := types.NamespacedName{Namespace: r.Config.Namespace, Name: platform.ConfigMapName}
@@ -359,7 +367,7 @@ func resourceQuota(p *v1.Project, cfg *platform.Config, ns string, classes []ins
 // ResourceQuota requires. It sets no default limits: a default limit applies to
 // every container that declares none, so the 1 CPU default that used to be here
 // made the API server reject any container requesting more than 1 CPU or 1Gi
-// (a request above its own limit), such as the inference router's 4 and 8 CPU.
+// (a request above its own limit), such as a sidecar that asks for 4 CPU.
 // The quota counts requests only, so the limits bought nothing.
 func limitRange(p *v1.Project, ns string) *corev1.LimitRange {
 	return &corev1.LimitRange{
@@ -389,7 +397,7 @@ func networkPolicy(p *v1.Project, cfg *platform.Config, ns string) *networkingv1
 	// The agent-sandbox controller runs outside the project and talks to the
 	// sandbox API server on the pod IP and to its port-forward (kubectl,
 	// port 80 of the pod IP) inside the sandbox.
-	agents := nsPeer(cfg.Sandbox.NamespaceOrDefault())
+	agents := nsPeer(cfg.Network.SandboxNamespace)
 	same := networkingv1.NetworkPolicyPeer{PodSelector: &metav1.LabelSelector{}}
 	from := []networkingv1.NetworkPolicyPeer{same}
 	for _, n := range cfg.Network.SystemNamespaces {
@@ -724,16 +732,18 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Config.Invalidate()
 		return projectRequests(ctx)
 	})
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Project{}).
 		Watches(&corev1.Namespace{}, byProjectLabel, managed).
 		Watches(&corev1.ResourceQuota{}, byProjectLabel, managed).
 		Watches(&corev1.LimitRange{}, byProjectLabel, managed).
 		Watches(&networkingv1.NetworkPolicy{}, byProjectLabel, managed).
 		Watches(&rbacv1.RoleBinding{}, byProjectLabel, managed).
-		Watches(&corev1.ServiceAccount{}, byProjectLabel, managed).
-		Watches(lq, byProjectLabel, managed).
-		Watches(cq, byProjectLabel, managed).
+		Watches(&corev1.ServiceAccount{}, byProjectLabel, managed)
+	if r.Kueue {
+		b = b.Watches(lq, byProjectLabel, managed).Watches(cq, byProjectLabel, managed)
+	}
+	return b.
 		// Quotas follow the GPU classes and their slices.
 		Watches(instanceTypeObject(), allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		// Project namespaces carry a copy of the platform config.

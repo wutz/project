@@ -1,5 +1,5 @@
-// Package naming holds object names, label keys and annotations shared by the
-// operator and the GUI.
+// Package naming holds object names, label keys and annotations set by the
+// operator. Other platforms that read them import this package.
 package naming
 
 import (
@@ -7,138 +7,35 @@ import (
 	"strings"
 )
 
-// Labels and annotations.
+// Labels set by the operator.
 const (
 	LabelManagedBy = "app.kubernetes.io/managed-by"
-	LabelComponent = "app.kubernetes.io/component"
-	ManagedBy      = "forgeai"
-
-	// LabelProject is set on project namespaces and every object forgeai
+	// ManagedBy is the LabelManagedBy value of every object the operator creates.
+	ManagedBy = "project"
+	// LabelProject is set on project namespaces and every object the operator
 	// creates for a project (value = Project name).
-	LabelProject = "forgeai.wutz.dev/project"
+	LabelProject = "project.wutz.dev/project"
 	// LabelMember is set on member ServiceAccounts and token Secrets.
-	LabelMember = "forgeai.wutz.dev/member"
-
-	// LabelTrash marks a volume (PVC) in the trash.
-	LabelTrash = "forgeai.wutz.dev/trash"
-	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
-	AnnotationTrashedAt = "forgeai.wutz.dev/trashed-at"
-	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).
-	AnnotationExpireAt = "forgeai.wutz.dev/expire-at"
-	// LabelVolumeType is the platform storage type of a volume.
-	LabelVolumeType = "forgeai.wutz.dev/volume-type"
-
-	// AnnotationLastActive is a client heartbeat on a FileServer (RFC3339).
-	AnnotationLastActive = "forgeai.wutz.dev/last-active"
-	// AnnotationStopped marks a TrainJob or Sandbox the user stopped.
-	AnnotationStopped = "forgeai.wutz.dev/stopped"
-	// AnnotationIdleSince is when the operator suspended an idle Sandbox.
-	AnnotationIdleSince = "forgeai.wutz.dev/idle-since"
-	// AnnotationIdleTimeout is the idle timeout a Sandbox was created with
-	// (Go duration); absent means the platform's sandbox.idleTimeout applies.
-	AnnotationIdleTimeout = "forgeai.wutz.dev/idle-timeout"
-	// AnnotationGatewayPort is the port a Sandbox serves HTTP on, published
-	// through the platform gateway; absent means it is not published.
-	AnnotationGatewayPort = "forgeai.wutz.dev/gateway-port"
-
-	// LabelTemplate marks a TrainingRuntime as a user job template.
-	LabelTemplate = "forgeai.wutz.dev/template"
-	// AnnotationDescription describes a template.
-	AnnotationDescription = "forgeai.wutz.dev/description"
-	// LabelInstanceType is the InstanceType of a TrainJob.
-	LabelInstanceType = "forgeai.wutz.dev/instance-type"
-	// LabelJobGroup groups a TrainJob with its retries (value = first job name).
-	LabelJobGroup = "forgeai.wutz.dev/job-group"
-	// AnnotationMaxRetries is how often a failed TrainJob is resubmitted.
-	AnnotationMaxRetries = "forgeai.wutz.dev/max-retries"
-	// AnnotationRetryOn is Infra (default) or Any.
-	AnnotationRetryOn = "forgeai.wutz.dev/retry-on"
-	// AnnotationRetry is the attempt number of a resubmitted TrainJob.
-	AnnotationRetry = "forgeai.wutz.dev/retry"
-	// AnnotationFailureReason is the failure classification of a TrainJob.
-	AnnotationFailureReason = "forgeai.wutz.dev/failure-reason"
-	// AnnotationFailureMessage details the failure.
-	AnnotationFailureMessage = "forgeai.wutz.dev/failure-message"
-	// AnnotationObservedFailureReason is the worker failure seen while the
-	// TrainJob ran. The Trainer removes its pods once the job fails, so this
-	// is the record of the cause when the failure is classified afterwards.
-	AnnotationObservedFailureReason = "forgeai.wutz.dev/observed-failure-reason"
-	// AnnotationObservedFailureMessage details the observed worker failure.
-	AnnotationObservedFailureMessage = "forgeai.wutz.dev/observed-failure-message"
-	// AnnotationRetriedAs is the name of the TrainJob that retried this one.
-	AnnotationRetriedAs = "forgeai.wutz.dev/retried-as"
-
+	LabelMember = "project.wutz.dev/member"
 	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
-	LabelGPUClass = "forgeai.wutz.dev/gpu-class"
-
+	LabelGPUClass = "project.wutz.dev/gpu-class"
 	// Node labels from NVIDIA GPU feature discovery.
 	LabelGPUProduct = "nvidia.com/gpu.product"
-	LabelGPUCount   = "nvidia.com/gpu.count"
 	LabelGPUMemory  = "nvidia.com/gpu.memory"
-
-	// LabelInference is set on the model servers and the llm-d router of an
-	// InferenceService (value = InferenceService name). The router selects its
-	// model servers by it.
-	LabelInference = "forgeai.wutz.dev/inference"
-
-	// LabelSSH is set on a sandbox that serves SSH (value = "true"). The
-	// operator adds the sshd sidecar and the Service of the sandbox for it.
-	LabelSSH = "forgeai.wutz.dev/ssh"
-	// LabelSandbox is set on the pods of a sandbox (value = Sandbox name). The
-	// SSH Service selects its sshd by it.
-	LabelSandbox = "forgeai.wutz.dev/sandbox"
-	// LabelSSHGateway is set on the Pipes and the sshpiperd objects of an
-	// SSHGateway (value = SSHGateway name).
-	LabelSSHGateway = "forgeai.wutz.dev/ssh-gateway"
-	// AnnotationSSHRoute is the namespace/name of the SSHRoute a Pipe serves.
-	AnnotationSSHRoute = "forgeai.wutz.dev/ssh-route"
-	// AnnotationSSHRule is the index of the SSHRoute rule a Pipe serves.
-	AnnotationSSHRule = "forgeai.wutz.dev/ssh-rule"
-
-	ComponentFileServer = "fileserver"
-	ComponentSandbox    = "sandbox"
-	ComponentInference  = "inference"
-	ComponentSSHGateway = "ssh-gateway"
 )
-
-// SSHSidecarContainer is the name of the sshd container of a sandbox.
-const SSHSidecarContainer = "sshd"
-
-// SSHIdentitySecretName is the platform Secret in the platform namespace that
-// holds the key the gateway uses to log in to sandboxes.
-const SSHIdentitySecretName = "forgeai-ssh"
-
-// SSHHostKeySecret is the Secret of an SSH Service that holds the host key of
-// the sshd behind it. The gateway pins that key from it.
-func SSHHostKeySecret(service string) string { return service + "-hostkey" }
-
-// SSHServiceName is the Service that exposes the sshd of a sandbox.
-func SSHServiceName(sandbox string) string { return sandbox + "-ssh" }
-
-// SSHGatewayName is the name of the sshpiperd Deployment, Service and
-// ConfigMap of an SSHGateway.
-func SSHGatewayName(gateway string) string { return "sshgateway-" + gateway }
-
-// InferenceAPIKey is the key of the API key Secret of an InferenceService.
-const InferenceAPIKey = "api-key"
-
-// InferenceAPIKeySecret is the Secret holding the API key of an InferenceService.
-func InferenceAPIKeySecret(service string) string { return service + "-api-key" }
 
 // Fixed names inside a project namespace.
 const (
-	LocalQueueName       = "default"
-	RegistrySecretName   = "forgeai-registry"
-	FileServerName       = "default"
-	FileServerSecretName = "forgeai-fileserver"
-	NetworkPolicyName    = "forgeai-isolation"
-	ResourceQuotaName    = "forgeai-quota"
-	LimitRangeName       = "forgeai-defaults"
+	LocalQueueName     = "default"
+	RegistrySecretName = "project-registry"
+	NetworkPolicyName  = "project-isolation"
+	ResourceQuotaName  = "project-quota"
+	LimitRangeName     = "project-defaults"
 )
 
 // ClusterRolePrefix + role (edit, view) is bound per member in the project
 // namespace (see config/rbac/project_roles.yaml).
-const ClusterRolePrefix = "forgeai-project-"
+const ClusterRolePrefix = "project-"
 
 // Namespace is the namespace of a project.
 func Namespace(prefix, project string) string { return prefix + project }
@@ -149,7 +46,7 @@ func ClusterQueue(namespace string) string { return namespace }
 // ProjectClusterRole is the per-project ClusterRole (and binding) granting
 // members read access to the Project, its ClusterQueue and cluster-wide
 // catalogues.
-func ProjectClusterRole(project string) string { return "forgeai:project:" + project }
+func ProjectClusterRole(project string) string { return "project:project:" + project }
 
 // MemberServiceAccount is the ServiceAccount of a member in the members
 // namespace. Project and member names are DNS labels, so the dot keeps
@@ -160,7 +57,7 @@ func MemberServiceAccount(project, member string) string { return project + "." 
 func MemberTokenSecret(project, member string) string { return project + "." + member + ".token" }
 
 // MemberRoleBinding binds a member to its role in the project namespace.
-func MemberRoleBinding(member string) string { return "forgeai-member-" + member }
+func MemberRoleBinding(member string) string { return "project-member-" + member }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -183,7 +80,7 @@ func InstanceTypeName(class string, count int32) string {
 }
 
 // ResourceFlavor is the Kueue ResourceFlavor of a GPU class.
-func ResourceFlavor(class string) string { return "forgeai-" + class }
+func ResourceFlavor(class string) string { return "project-" + class }
 
 func itoa(n int32) string {
 	if n == 0 {
@@ -210,6 +107,3 @@ const (
 	KeySpec       = "spec"
 	KeyStatus     = "status"
 )
-
-// LiteralTrue is the string form of a boolean true in labels and annotations.
-const LiteralTrue = "true"

@@ -1,4 +1,4 @@
-module github.com/wutz/project-operator
+module github.com/wutz/project
 
 go 1.26.0
 

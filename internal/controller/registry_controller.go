@@ -36,14 +36,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/pkg/harbor"
-	"github.com/wutz/project-operator/pkg/naming"
-	"github.com/wutz/project-operator/pkg/platform"
+	v1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/harbor"
+	"github.com/wutz/project/pkg/naming"
+	"github.com/wutz/project/pkg/platform"
 )
 
 const (
-	registryFinalizer = "forgeai.wutz.dev/registry"
+	registryFinalizer = "project.wutz.dev/registry"
 	kindSecret        = "Secret"
 	// Keys of the registry Secret besides .dockerconfigjson.
 	RegistryKeyUsername = "username"
@@ -65,8 +65,8 @@ type RegistryReconciler struct {
 	NewHarbor       HarborFactory
 }
 
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 func (r *RegistryReconciler) harbor(ctx context.Context, cfg *platform.Config) (*harbor.Client, error) {

@@ -2,7 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/forgeai.wutz.dev_projects.yaml
+- bases/project.wutz.dev_instancetypes.yaml
+- bases/project.wutz.dev_projects.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

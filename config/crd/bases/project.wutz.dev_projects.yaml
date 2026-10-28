@@ -1,18 +1,15 @@
-{{- if .Values.crd.enabled }}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    {{- if .Values.crd.keep }}
-    "helm.sh/resource-policy": keep
-    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: projects.forgeai.wutz.dev
+  name: projects.project.wutz.dev
 spec:
-  group: forgeai.wutz.dev
+  group: project.wutz.dev
   names:
     categories:
-    - forgeai
+    - project
     kind: Project
     listKind: ProjectList
     plural: projects
@@ -285,7 +282,7 @@ spec:
                       (dockerconfigjson).
                     type: string
                   url:
-                    description: url is the push prefix, e.g. cr.example.com:7443/forge-foo.
+                    description: url is the push prefix, e.g. cr.example.com:7443/project-foo.
                     type: string
                 type: object
             type: object
@@ -300,4 +297,3 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}

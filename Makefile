@@ -69,7 +69,7 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # - KUBECTL_KUBERC=true
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= project-operator-test-e2e
+KIND_CLUSTER ?= project-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -140,10 +140,10 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name project-operator-builder
-	$(CONTAINER_TOOL) buildx use project-operator-builder
+	- $(CONTAINER_TOOL) buildx create --name project-builder
+	$(CONTAINER_TOOL) buildx use project-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm project-operator-builder
+	- $(CONTAINER_TOOL) buildx rm project-builder
 	rm Dockerfile.cross
 
 .PHONY: build-installer
@@ -264,9 +264,9 @@ endef
 ## Helm binary to use for deploying the chart
 HELM ?= helm
 ## Namespace to deploy the Helm release
-HELM_NAMESPACE ?= project-operator-system
+HELM_NAMESPACE ?= project-system
 ## Name of the Helm release
-HELM_RELEASE ?= project-operator
+HELM_RELEASE ?= project
 ## Path to the Helm chart directory
 HELM_CHART_DIR ?= charts/chart
 ## Additional arguments to pass to helm commands
@@ -323,6 +323,6 @@ helm-package: install-helm ## Package the Helm chart into dist/. CHART_VERSION s
 		$(if $(CHART_VERSION),--version $(CHART_VERSION) --app-version $(CHART_VERSION))
 
 .PHONY: helm-push
-helm-push: install-helm ## Push dist/project-operator-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
+helm-push: install-helm ## Push dist/project-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
 	@test -n "$(CHART_VERSION)" || { echo "CHART_VERSION is required"; exit 1; }
-	$(HELM) push dist/project-operator-$(CHART_VERSION).tgz $(HELM_OCI_REPO)
+	$(HELM) push dist/project-$(CHART_VERSION).tgz $(HELM_OCI_REPO)

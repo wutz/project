@@ -1,12 +1,14 @@
-# project-operator
+# project
 
 A Kubernetes operator that turns a `Project` custom resource into an isolated
 workspace: a namespace with a GPU/CPU/memory quota, a Kueue queue, storage and
 pod limits, a network policy, and per-member access.
 
-The operator runs two controllers. The Project controller reconciles the
-`Project` API (`forgeai.wutz.dev/v1alpha1`). The registry controller gives each
-Project a Harbor project when the platform config enables a registry.
+The operator runs three controllers. The Project controller reconciles the
+`Project` API (`project.wutz.dev/v1alpha1`). The InstanceType controller derives one
+`InstanceType` per GPU class and size from the GPU nodes and keeps its availability up to
+date. The registry controller gives each Project a Harbor project when the platform config
+enables a registry.
 
 ## What a Project creates
 
@@ -15,7 +17,7 @@ For each `Project` the operator reconciles:
 - A project namespace. The name prefix comes from the platform config.
 - A `ResourceQuota` derived from `spec.quota`. GPU quota is per GPU class; CPU and
   memory follow from the per-GPU slice of each `InstanceType`.
-- Kueue queue objects for the project's GPU classes.
+- Kueue ClusterQueue and LocalQueue objects, only when the Kueue API is installed (see `--enable-kueue`).
 - A `NetworkPolicy` according to `spec.network`. `Isolated` admits traffic only from
   the project and platform namespaces; `denyInternet` also blocks egress outside the project.
 - For each entry in `spec.members`, a ServiceAccount in the platform members namespace
@@ -25,10 +27,10 @@ For each `Project` the operator reconciles:
 `spec.deletionPolicy` decides whether the namespace (and its volumes) and the registry
 project are removed (`Delete`) or only access is revoked (`Retain`, the default).
 
-A minimal example, from [config/samples/forgeai_v1alpha1_project.yaml](config/samples/forgeai_v1alpha1_project.yaml):
+A minimal example, from [config/samples/project_v1alpha1_project.yaml](config/samples/project_v1alpha1_project.yaml):
 
 ```yaml
-apiVersion: forgeai.wutz.dev/v1alpha1
+apiVersion: project.wutz.dev/v1alpha1
 kind: Project
 metadata:
   name: demo
@@ -56,11 +58,14 @@ spec:
 ## Requirements
 
 - Kubernetes 1.37 (the version the envtest suite runs against).
-- [Kueue](https://kueue.sigs.k8s.io/) with the `kueue.x-k8s.io/v1beta2` API.
-- The `InstanceType` CRD (`instancetypes.forgeai.wutz.dev`). The operator reads it to size GPU quotas.
-- A platform config ConfigMap named `forgeai-platform` with key `config.yaml`, in the
-  namespace given by `FORGEAI_NAMESPACE` (default `forgeai-system`). It holds the
-  namespace prefix, storage types, registry, default quotas and ingress settings.
+- [Kueue](https://kueue.sigs.k8s.io/) with the `kueue.x-k8s.io/v1beta2` API. Optional: without it the
+  operator keeps no queues or ResourceFlavors, and the ResourceQuota alone limits a project.
+- GPU nodes labelled with `nvidia.com/gpu.product`. The operator derives the `InstanceType`
+  objects (`instancetypes.project.wutz.dev`) from them and uses them to size GPU quotas.
+- A platform config ConfigMap named `project-platform` with key `config.yaml`, in the
+  namespace the operator runs in (`PROJECT_NAMESPACE`, which the chart sets to the release
+  namespace). The platform that installs the operator creates it. It holds the namespace
+  prefix, registry, instance type sizing, default quotas, network and ingress settings.
   The operator reloads it when it changes.
 
 ## Install
@@ -68,18 +73,19 @@ spec:
 The chart is published as an OCI artifact and the image to GHCR. Both are public.
 
 ```bash
-helm install project-operator oci://ghcr.io/wutz/charts/project-operator \
-  --version 0.4.1 \
-  --namespace forgeai-system
+helm install project oci://ghcr.io/wutz/charts/project \
+  --version 0.5.0 \
+  --namespace project-system
 ```
 
-Install it into the forgeai namespace, next to forgeai. The operator reads the platform ConfigMap from its own namespace, so it must run where forgeai's `forgeai-platform` ConfigMap lives (`FORGEAI_NAMESPACE`, default `forgeai-system`).
+The operator reads the platform ConfigMap from its own namespace, so the platform config
+must be created in the namespace the chart is installed into.
 
 Override values with `--set` or a values file. Common settings:
 
 | Key | Default | Description |
 |---|---|---|
-| `manager.image.repository` | `ghcr.io/wutz/project-operator` | Controller image |
+| `manager.image.repository` | `ghcr.io/wutz/project` | Controller image |
 | `manager.image.tag` | `Chart.appVersion` | Controller image tag |
 | `manager.replicas` | `1` | Controller replicas (leader election is enabled) |
 | `metrics.enabled` | `true` | Serve Prometheus metrics |
@@ -114,8 +120,8 @@ make test-e2e
 ## Releases
 
 Pushing a `v*` tag runs `.github/workflows/helm-release.yml`. It publishes the
-container image to `ghcr.io/wutz/project-operator` and the chart to
-`oci://ghcr.io/wutz/charts/project-operator`, both tagged with the release version.
+container image to `ghcr.io/wutz/project` and the chart to
+`oci://ghcr.io/wutz/charts/project`, both tagged with the release version.
 
 ## License
 

@@ -28,8 +28,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,10 +43,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	forgeaiv1alpha1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/internal/controller"
-	"github.com/wutz/project-operator/pkg/naming"
-	"github.com/wutz/project-operator/pkg/platform"
+	projectv1alpha1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/internal/controller"
+	"github.com/wutz/project/pkg/naming"
+	"github.com/wutz/project/pkg/platform"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -56,7 +58,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(forgeaiv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(projectv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -70,6 +72,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var enableKueue bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -90,6 +93,8 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(&enableKueue, "enable-kueue", true,
+		"Maintain Kueue ClusterQueues, LocalQueues and ResourceFlavors when the Kueue API is installed.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -189,7 +194,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "project-operator.wutz.dev",
+		LeaderElectionID:       "project.wutz.dev",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -208,9 +213,15 @@ func main() {
 	}
 
 	cfg := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: platform.Namespace()}
+	// Kueue is optional: queues and ResourceFlavors are maintained only when its API is installed.
+	kueue := enableKueue && kueueInstalled(mgr.GetRESTMapper())
+	if !kueue {
+		setupLog.Info("Kueue is not in use; ClusterQueues, LocalQueues and ResourceFlavors are not maintained")
+	}
 	for name, r := range map[string]interface{ SetupWithManager(ctrl.Manager) error }{
+		"instancetype": &controller.InstanceTypeReconciler{Client: mgr.GetClient(), Config: cfg, Kueue: kueue},
 		"project": &controller.ProjectReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: cfg,
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: cfg, Kueue: kueue,
 		},
 		"registry": &controller.RegistryReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
@@ -237,4 +248,13 @@ func main() {
 		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}
+}
+
+// kueueInstalled reports whether the Kueue ClusterQueue API is served.
+func kueueInstalled(m meta.RESTMapper) bool {
+	_, err := m.RESTMapping(schema.GroupKind{Group: "kueue.x-k8s.io", Kind: "ClusterQueue"}, "v1beta2")
+	if err != nil && !meta.IsNoMatchError(err) {
+		setupLog.Error(err, "Failed to look up the Kueue API")
+	}
+	return err == nil
 }

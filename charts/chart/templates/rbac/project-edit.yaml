@@ -1,14 +1,22 @@
+# Member role bound in the project namespace. The operator binds it by name, so
+# it is not prefixed with the release name. It aggregates every ClusterRole
+# labelled project.wutz.dev/aggregate-to-member=edit; a platform adds rules for
+# its own kinds with a labelled ClusterRole of its own.
 apiVersion: rbac.authorization.k8s.io/v1
-{{- if .Values.rbac.namespaced }}
-kind: Role
-{{- else }}
 kind: ClusterRole
-{{- end }}
 metadata:
-{{- if .Values.rbac.namespaced }}
-  namespace: {{ .Release.Namespace }}
-{{- end }}
-  name: {{ include "project-operator.resourceName" (dict "suffix" "project-edit" "context" $) }}
+  name: project-edit
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      project.wutz.dev/aggregate-to-member: edit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: project-member-edit
+  labels:
+    project.wutz.dev/aggregate-to-member: edit
 rules:
 - apiGroups:
   - ""
@@ -96,29 +104,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - forgeai.wutz.dev
-  resources:
-  - fileservers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-- apiGroups:
-  - forgeai.wutz.dev
-  resources:
-  - inferenceservices
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
   - agents.x-k8s.io
   resources:

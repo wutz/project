@@ -152,7 +152,7 @@ type MemberStatus struct {
 type RegistryStatus struct {
 	// project is the Harbor project name.
 	Project string `json:"project,omitempty"`
-	// url is the push prefix, e.g. cr.example.com:7443/forge-foo.
+	// url is the push prefix, e.g. cr.example.com:7443/project-foo.
 	URL string `json:"url,omitempty"`
 	// secret in the project namespace holds the robot account (dockerconfigjson).
 	Secret string `json:"secret,omitempty"`
@@ -189,7 +189,7 @@ const (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=fproj,categories=forgeai
+// +kubebuilder:resource:scope=Cluster,shortName=fproj,categories=project
 // +kubebuilder:printcolumn:name="Namespace",type=string,JSONPath=`.status.namespace`
 // +kubebuilder:printcolumn:name="Isolation",type=string,JSONPath=`.spec.network.isolation`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`

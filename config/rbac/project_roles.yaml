@@ -1,13 +1,29 @@
 # Roles bound by the operator for Project members. Members are ServiceAccounts
-# in forgeai-members; "edit" or "view" is bound in the project namespace. The
-# operator also creates forgeai:project:<name>, granting members read access
+# in project-members; "edit" or "view" is bound in the project namespace. The
+# operator also creates project:project:<name>, granting members read access
 # to their Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes.
+#
+# project-edit and project-view aggregate every ClusterRole labelled
+# project.wutz.dev/aggregate-to-member=<role>. The rules here cover the
+# third-party APIs the platform workloads use; a platform adds the rules for its
+# own kinds with its own labelled ClusterRoles.
 #
 # Members cannot change quotas, network policies, RBAC or namespaces.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: project-edit
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      project.wutz.dev/aggregate-to-member: edit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: project-member-edit
+  labels:
+    project.wutz.dev/aggregate-to-member: edit
 rules:
 - apiGroups: [""]
   resources: [persistentvolumeclaims]
@@ -20,7 +36,7 @@ rules:
   resources: [pods/exec]
   verbs: [create]
 - apiGroups: [""]
-  # Registry robot and file server credentials.
+  # Registry robot credentials.
   resources: [secrets]
   verbs: [get, list, watch]
 - apiGroups: [events.k8s.io]
@@ -38,12 +54,6 @@ rules:
 - apiGroups: [kueue.x-k8s.io]
   resources: [localqueues, workloads]
   verbs: [get, list, watch]
-- apiGroups: [forgeai.wutz.dev]
-  resources: [fileservers]
-  verbs: [get, list, watch, create, update, patch]
-- apiGroups: [forgeai.wutz.dev]
-  resources: [inferenceservices]
-  verbs: [get, list, watch, create, update, patch, delete]
 # Agent sandboxes (SIG Apps agent-sandbox): members run their own sandboxes.
 - apiGroups: [agents.x-k8s.io]
   resources: [sandboxes]
@@ -62,6 +72,17 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: project-view
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      project.wutz.dev/aggregate-to-member: view
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: project-member-view
+  labels:
+    project.wutz.dev/aggregate-to-member: view
 rules:
 - apiGroups: [""]
   resources: [persistentvolumeclaims, pods, pods/log, events, resourcequotas, limitranges]
@@ -69,7 +90,7 @@ rules:
 # The copy of the platform config the GUI reads; the operator writes it into each project.
 - apiGroups: [""]
   resources: [configmaps]
-  resourceNames: [forgeai-platform]
+  resourceNames: [project-platform]
   verbs: [get]
 - apiGroups: [events.k8s.io]
   resources: [events]
@@ -82,12 +103,6 @@ rules:
   verbs: [get, list, watch]
 - apiGroups: [kueue.x-k8s.io]
   resources: [localqueues, workloads]
-  verbs: [get, list, watch]
-- apiGroups: [forgeai.wutz.dev]
-  resources: [fileservers]
-  verbs: [get, list, watch]
-- apiGroups: [forgeai.wutz.dev]
-  resources: [inferenceservices]
   verbs: [get, list, watch]
 - apiGroups: [agents.x-k8s.io]
   resources: [sandboxes]

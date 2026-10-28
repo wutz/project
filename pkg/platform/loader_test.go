@@ -13,11 +13,11 @@ import (
 func TestLoaderInvalidate(t *testing.T) {
 	ctx := context.Background()
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "forgeai-system", Name: ConfigMapName},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "project-system", Name: ConfigMapName},
 		Data:       map[string]string{ConfigKey: "namespacePrefix: old-\n"},
 	}
 	c := fake.NewClientBuilder().WithObjects(cm).Build()
-	l := &Loader{Reader: c, Namespace: "forgeai-system"}
+	l := &Loader{Reader: c, Namespace: "project-system"}
 
 	prefix := func() string {
 		t.Helper()
@@ -46,7 +46,7 @@ func TestLoaderInvalidate(t *testing.T) {
 func update(t *testing.T, c client.Client, data string) {
 	t.Helper()
 	cm := &corev1.ConfigMap{}
-	if err := c.Get(context.Background(), client.ObjectKey{Namespace: "forgeai-system", Name: ConfigMapName}, cm); err != nil {
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: "project-system", Name: ConfigMapName}, cm); err != nil {
 		t.Fatal(err)
 	}
 	cm.Data[ConfigKey] = data
