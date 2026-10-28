@@ -323,6 +323,6 @@ helm-package: install-helm ## Package the Helm chart into dist/. CHART_VERSION s
 		$(if $(CHART_VERSION),--version $(CHART_VERSION) --app-version $(CHART_VERSION))
 
 .PHONY: helm-push
-helm-push: install-helm ## Push dist/project-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
+helm-push: install-helm ## Push dist/workspace-CHART_VERSION.tgz to HELM_OCI_REPO. Log in to the registry first.
 	@test -n "$(CHART_VERSION)" || { echo "CHART_VERSION is required"; exit 1; }
-	$(HELM) push dist/project-$(CHART_VERSION).tgz $(HELM_OCI_REPO)
+	$(HELM) push dist/workspace-$(CHART_VERSION).tgz $(HELM_OCI_REPO)
