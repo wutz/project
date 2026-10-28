@@ -8,7 +8,7 @@ metadata:
 {{- if .Values.rbac.namespaced }}
   namespace: {{ .Release.Namespace }}
 {{- end }}
-  name: {{ include "project-operator.resourceName" (dict "suffix" "manager-role" "context" $) }}
+  name: {{ include "project.resourceName" (dict "suffix" "manager-role" "context" $) }}
 rules:
 - apiGroups:
   - ""
@@ -38,6 +38,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - authorization.k8s.io
   resources:
   - selfsubjectaccessreviews
@@ -45,16 +54,9 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - forgeai.wutz.dev
+  - project.wutz.dev
   resources:
   - instancetypes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - forgeai.wutz.dev
-  resources:
   - projects
   verbs:
   - create
@@ -65,15 +67,18 @@ rules:
   - update
   - watch
 - apiGroups:
-  - forgeai.wutz.dev
+  - project.wutz.dev
   resources:
-  - projects/finalizers
+  - instancetypes/status
+  - projects/status
   verbs:
+  - get
+  - patch
   - update
 - apiGroups:
-  - forgeai.wutz.dev
+  - project.wutz.dev
   resources:
-  - projects/status
+  - projects/finalizers
   verbs:
   - get
   - patch

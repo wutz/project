@@ -44,12 +44,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/pkg/instancetype"
-	"github.com/wutz/project-operator/pkg/kf"
-	"github.com/wutz/project-operator/pkg/naming"
-	"github.com/wutz/project-operator/pkg/platform"
-	"github.com/wutz/project-operator/pkg/sandbox"
+	v1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
+	"github.com/wutz/project/pkg/kf"
+	"github.com/wutz/project/pkg/naming"
+	"github.com/wutz/project/pkg/platform"
+	"github.com/wutz/project/pkg/sandbox"
 )
 
 const (
@@ -70,18 +70,21 @@ type ProjectReconciler struct {
 	APIReader client.Reader
 	Scheme    *runtime.Scheme
 	Config    *platform.Loader
+	// Kueue is false when the cluster has no Kueue API: no queues are kept
+	// and the ResourceQuota alone limits the project.
+	Kueue bool
 }
 
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects/finalizers,verbs=update
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts;secrets;resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=clusterqueues;localqueues,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // The member roles bound by the operator (it may only grant what it holds):
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
 
@@ -201,7 +204,10 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 	if err != nil {
 		return err
 	}
-	objs := []client.Object{platformConfig, resourceQuota(p, cfg, ns, classes), limitRange(p, ns), localQueue(p, ns)}
+	objs := []client.Object{platformConfig, resourceQuota(p, cfg, ns, classes), limitRange(p, ns)}
+	if r.Kueue {
+		objs = append(objs, localQueue(p, ns))
+	}
 	if np := networkPolicy(p, cfg, ns); np != nil {
 		objs = append(objs, np)
 	}
@@ -217,14 +223,16 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 			return err
 		}
 	}
-	if err := apply(ctx, r.Client, cpuResourceFlavor()); err != nil {
-		return fmt.Errorf("apply CPU ResourceFlavor: %w", err)
+	if r.Kueue {
+		if err := apply(ctx, r.Client, cpuResourceFlavor()); err != nil {
+			return fmt.Errorf("apply CPU ResourceFlavor: %w", err)
+		}
+		if err := apply(ctx, r.Client, clusterQueue(p, cfg, ns, classes)); err != nil {
+			return fmt.Errorf("apply ClusterQueue: %w", err)
+		}
+		p.Status.ClusterQueue = naming.ClusterQueue(ns)
+		p.Status.LocalQueue = naming.LocalQueueName
 	}
-	if err := apply(ctx, r.Client, clusterQueue(p, cfg, ns, classes)); err != nil {
-		return fmt.Errorf("apply ClusterQueue: %w", err)
-	}
-	p.Status.ClusterQueue = naming.ClusterQueue(ns)
-	p.Status.LocalQueue = naming.LocalQueueName
 	return r.reconcileMembers(ctx, p, cfg, ns)
 }
 
@@ -724,16 +732,18 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Config.Invalidate()
 		return projectRequests(ctx)
 	})
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Project{}).
 		Watches(&corev1.Namespace{}, byProjectLabel, managed).
 		Watches(&corev1.ResourceQuota{}, byProjectLabel, managed).
 		Watches(&corev1.LimitRange{}, byProjectLabel, managed).
 		Watches(&networkingv1.NetworkPolicy{}, byProjectLabel, managed).
 		Watches(&rbacv1.RoleBinding{}, byProjectLabel, managed).
-		Watches(&corev1.ServiceAccount{}, byProjectLabel, managed).
-		Watches(lq, byProjectLabel, managed).
-		Watches(cq, byProjectLabel, managed).
+		Watches(&corev1.ServiceAccount{}, byProjectLabel, managed)
+	if r.Kueue {
+		b = b.Watches(lq, byProjectLabel, managed).Watches(cq, byProjectLabel, managed)
+	}
+	return b.
 		// Quotas follow the GPU classes and their slices.
 		Watches(instanceTypeObject(), allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		// Project namespaces carry a copy of the platform config.

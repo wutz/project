@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- forgeai_v1alpha1_project.yaml
+- project_v1alpha1_project.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

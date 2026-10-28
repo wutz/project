@@ -18,11 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/project-operator/api/v1alpha1"
-	"github.com/wutz/project-operator/pkg/instancetype"
-	"github.com/wutz/project-operator/pkg/kf"
-	"github.com/wutz/project-operator/pkg/naming"
-	"github.com/wutz/project-operator/pkg/platform"
+	v1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
+	"github.com/wutz/project/pkg/kf"
+	"github.com/wutz/project/pkg/naming"
+	"github.com/wutz/project/pkg/platform"
 )
 
 const (
@@ -31,8 +31,9 @@ const (
 	gpuProduct = "NVIDIA-GeForce-RTX-5090"
 )
 
-// createInstanceType creates an InstanceType as the forgeai operator derives
-// it from a GPU node pool; this operator only reads them.
+// createInstanceType creates an InstanceType as the InstanceType controller
+// derives it from a GPU node pool. The controller may have created it first,
+// with the same spec, so an existing one is kept.
 func createInstanceType(name, class, product string, gpus int64, cpu, memory string) {
 	u := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": instancetype.GVK.GroupVersion().String(),
@@ -44,7 +45,7 @@ func createInstanceType(name, class, product string, gpus int64, cpu, memory str
 			"nodeSelector": map[string]any{naming.LabelGPUProduct: product},
 		},
 	}}
-	Expect(k8sClient.Create(ctx, u)).To(Succeed())
+	Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, u))).To(Succeed())
 }
 
 func get(obj client.Object, ns, name string) func() error {

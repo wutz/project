@@ -1,4 +1,4 @@
-# project-operator - AI Agent Guide
+# project - AI Agent Guide
 
 This repository is a single-controller Kubebuilder project. It reconciles the
 `Project` CRD (`forgeai.wutz.dev/v1alpha1`) and the registry controller that
@@ -40,7 +40,7 @@ PROJECT                        Kubebuilder metadata (generated)
 Do not delete `// +kubebuilder:scaffold:*` comments. The CLI injects code at these markers.
 
 ### Keep the Public Contract Stable
-- The API group `forgeai.wutz.dev`, the field owner `forgeai`, and the finalizer
+- The API group `project.wutz.dev`, the field owner `forgeai`, and the finalizer
   `forgeai.wutz.dev/project` are shared with existing objects created by the forgeai
   platform. Do not rename them without a migration.
 - The platform ConfigMap `forgeai-platform` (key `config.yaml`) in the namespace set by
@@ -115,8 +115,8 @@ Reference: https://github.com/kubernetes/community/blob/master/contributors/deve
 
 ## Distribution
 
-- Container image: `ghcr.io/wutz/project-operator`, built by the release workflow on tags.
-- Helm chart: `oci://ghcr.io/wutz/charts/project-operator`, versioned from `charts/chart/Chart.yaml`.
+- Container image: `ghcr.io/wutz/project`, built by the release workflow on tags.
+- Helm chart: `oci://ghcr.io/wutz/charts/project`, versioned from `charts/chart/Chart.yaml`.
 - Keep `charts/chart/Chart.yaml` `version` and `appVersion` in step with the release tag.
 
 ## References

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/wutz/project-operator/pkg/harbor"
-	"github.com/wutz/project-operator/pkg/harbor/harbortest"
+	"github.com/wutz/project/pkg/harbor"
+	"github.com/wutz/project/pkg/harbor/harbortest"
 )
 
 func TestProjectLifecycle(t *testing.T) {

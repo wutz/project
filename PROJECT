@@ -10,15 +10,23 @@ plugins:
   helm.kubebuilder.io/v2-alpha:
     manifests: dist/install.yaml
     output: charts
-projectName: project-operator
-repo: github.com/wutz/project-operator
+projectName: project
+repo: github.com/wutz/project
 resources:
 - api:
     crdVersion: v1
   controller: true
   domain: wutz.dev
-  group: forgeai
+  group: project
+  kind: InstanceType
+  path: github.com/wutz/project/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: wutz.dev
+  group: project
   kind: Project
-  path: github.com/wutz/project-operator/api/v1alpha1
+  path: github.com/wutz/project/api/v1alpha1
   version: v1alpha1
 version: "3"
