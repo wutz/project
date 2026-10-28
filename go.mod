@@ -1,4 +1,4 @@
-module github.com/wutz/project
+module github.com/wutz/workspace
 
 go 1.26.0
 
