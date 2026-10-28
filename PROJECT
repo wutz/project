@@ -10,23 +10,23 @@ plugins:
   helm.kubebuilder.io/v2-alpha:
     manifests: dist/install.yaml
     output: charts
-projectName: project
-repo: github.com/wutz/project
+projectName: workspace
+repo: github.com/wutz/workspace
 resources:
 - api:
     crdVersion: v1
   controller: true
   domain: wutz.dev
-  group: project
+  group: workspace
   kind: InstanceType
-  path: github.com/wutz/project/api/v1alpha1
+  path: github.com/wutz/workspace/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
   domain: wutz.dev
-  group: project
+  group: workspace
   kind: Project
-  path: github.com/wutz/project/api/v1alpha1
+  path: github.com/wutz/workspace/api/v1alpha1
   version: v1alpha1
 version: "3"
