@@ -1,18 +1,18 @@
 # workspace
 
-A Kubernetes operator that turns a `Workspace` custom resource into an isolated
+A Kubernetes operator that turns a `Project` custom resource into an isolated
 workspace: a namespace with a GPU/CPU/memory quota, a Kueue queue, storage and
 pod limits, a network policy, and per-member access.
 
 The operator runs three controllers. The Workspace controller reconciles the
-`Workspace` API (`workspace.wutz.dev/v1alpha1`). The InstanceType controller derives one
+`Project` API (`workspace.wutz.dev/v1alpha1`). The InstanceType controller derives one
 `InstanceType` per GPU class and size from the GPU nodes and keeps its availability up to
-date. The registry controller gives each Workspace a Harbor workspace when the platform config
+date. The registry controller gives each Project a Harbor project when the platform config
 enables a registry.
 
-## What a Workspace creates
+## What a Project creates
 
-For each `Workspace` the operator reconciles:
+For each `Project` the operator reconciles:
 
 - A workspace namespace. The name prefix comes from the platform config.
 - A `ResourceQuota` derived from `spec.quota`. GPU quota is per GPU class; CPU and
@@ -22,7 +22,7 @@ For each `Workspace` the operator reconciles:
   the workspace and platform namespaces; `denyInternet` also blocks egress outside the workspace.
 - For each entry in `spec.members`, a ServiceAccount in the platform members namespace
   and a long-lived token Secret. The member's `edit` or `view` role is bound in the workspace namespace.
-- When a registry is configured, a Harbor workspace named after the Workspace.
+- When a registry is configured, a Harbor project named after the Project.
 
 `spec.deletionPolicy` decides whether the namespace (and its volumes) and the registry
 project are removed (`Delete`) or only access is revoked (`Retain`, the default).
@@ -31,11 +31,11 @@ A minimal example, from [config/samples/workspace_v1alpha1_workspace.yaml](confi
 
 ```yaml
 apiVersion: workspace.wutz.dev/v1alpha1
-kind: Workspace
+kind: Project
 metadata:
   name: demo
 spec:
-  displayName: Demo workspace
+  displayName: Demo project
   quota:
     gpus:
     - class: rtx-5090
@@ -74,7 +74,7 @@ The chart is published as an OCI artifact and the image to GHCR. Both are public
 
 ```bash
 helm install workspace oci://ghcr.io/wutz/charts/workspace \
-  --version 0.5.0 \
+  --version 0.5.2 \
   --namespace workspace-system
 ```
 

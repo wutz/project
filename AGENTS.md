@@ -118,7 +118,7 @@ Reference: https://github.com/kubernetes/community/blob/master/contributors/deve
 ## Distribution
 
 - Container image: `ghcr.io/wutz/workspace`, built by the release workflow on tags.
-- Helm chart: `oci://ghcr.io/wutz/charts/project`, versioned from `charts/chart/Chart.yaml`.
+- Helm chart: `oci://ghcr.io/wutz/charts/workspace`, versioned from `charts/chart/Chart.yaml`.
 - Keep `charts/chart/Chart.yaml` `version` and `appVersion` in step with the release tag.
 
 ## References
