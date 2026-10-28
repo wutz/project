@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/wutz/project/pkg/platform"
+	"github.com/wutz/workspace/pkg/platform"
 )
 
 func gpuNode(name string, ready bool) corev1.Node {

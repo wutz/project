@@ -36,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	projectv1alpha1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/harbor"
-	"github.com/wutz/project/pkg/harbor/harbortest"
-	"github.com/wutz/project/pkg/platform"
+	projectv1alpha1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/harbor"
+	"github.com/wutz/workspace/pkg/harbor/harbortest"
+	"github.com/wutz/workspace/pkg/platform"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

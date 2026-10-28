@@ -13,9 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/naming"
-	"github.com/wutz/project/pkg/platform"
+	v1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/naming"
+	"github.com/wutz/workspace/pkg/platform"
 )
 
 // GVK of the InstanceType.

@@ -1,9 +1,9 @@
 name: Helm release
 
-# Publishes the project image and its Helm chart for a
+# Publishes the workspace image and its Helm chart for a
 # v<major>.<minor>.<patch> tag:
 #   ghcr.io/wutz/workspace:<version>
-#   oci://ghcr.io/wutz/charts/project:<version>
+#   oci://ghcr.io/wutz/charts/workspace:<version>
 # The chart's default image is the one above.
 #
 # A manual run (workflow_dispatch) publishes the version typed in, from main,
