@@ -53,8 +53,8 @@ import (
 )
 
 const (
-	fieldOwner       = client.FieldOwner("forgeai")
-	projectFinalizer = "forgeai.wutz.dev/project"
+	fieldOwner       = client.FieldOwner("project")
+	projectFinalizer = "project.wutz.dev/project"
 	kindClusterRole  = "ClusterRole"
 	keyNominalQuota  = "nominalQuota"
 	verbGet          = "get"
@@ -152,7 +152,7 @@ func projectLabels(p *v1.Project) map[string]string {
 	return map[string]string{naming.LabelManagedBy: naming.ManagedBy, naming.LabelProject: p.Name}
 }
 
-// apply server-side applies obj (typed or unstructured) as the forgeai field owner.
+// apply server-side applies obj (typed or unstructured) as the project field owner.
 func apply(ctx context.Context, c client.Client, obj client.Object) error {
 	u := &unstructured.Unstructured{}
 	if uo, ok := obj.(*unstructured.Unstructured); ok {
@@ -256,9 +256,9 @@ func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, 
 }
 
 // platformConfig mirrors the platform ConfigMap into the project namespace:
-// members read it there (storage types, registry, training defaults) and
-// have no access to the platform namespace. It is read uncached so a change
-// is copied by the reconcile it triggers.
+// members read it there (ingress, registry, instance types) and have no
+// access to the platform namespace. It is read uncached so a change is copied
+// by the reconcile it triggers.
 func (r *ProjectReconciler) platformConfig(ctx context.Context, p *v1.Project, ns string) (*corev1.ConfigMap, error) {
 	src := &corev1.ConfigMap{}
 	key := types.NamespacedName{Namespace: r.Config.Namespace, Name: platform.ConfigMapName}
@@ -367,7 +367,7 @@ func resourceQuota(p *v1.Project, cfg *platform.Config, ns string, classes []ins
 // ResourceQuota requires. It sets no default limits: a default limit applies to
 // every container that declares none, so the 1 CPU default that used to be here
 // made the API server reject any container requesting more than 1 CPU or 1Gi
-// (a request above its own limit), such as the inference router's 4 and 8 CPU.
+// (a request above its own limit), such as a sidecar that asks for 4 CPU.
 // The quota counts requests only, so the limits bought nothing.
 func limitRange(p *v1.Project, ns string) *corev1.LimitRange {
 	return &corev1.LimitRange{
@@ -397,7 +397,7 @@ func networkPolicy(p *v1.Project, cfg *platform.Config, ns string) *networkingv1
 	// The agent-sandbox controller runs outside the project and talks to the
 	// sandbox API server on the pod IP and to its port-forward (kubectl,
 	// port 80 of the pod IP) inside the sandbox.
-	agents := nsPeer(cfg.Sandbox.NamespaceOrDefault())
+	agents := nsPeer(cfg.Network.SandboxNamespace)
 	same := networkingv1.NetworkPolicyPeer{PodSelector: &metav1.LabelSelector{}}
 	from := []networkingv1.NetworkPolicyPeer{same}
 	for _, n := range cfg.Network.SystemNamespaces {

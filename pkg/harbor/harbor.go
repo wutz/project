@@ -1,6 +1,6 @@
 // Package harbor is a small Harbor v2 API client. The operator uses admin
-// credentials to manage one Harbor project and robot account per forgeai
-// project; the GUI uses the robot account to list and delete images.
+// credentials to manage one Harbor project and robot account per project; the
+// GUI uses the robot account to list and delete images.
 package harbor
 
 import (
@@ -24,7 +24,7 @@ import (
 var ErrNotFound = errors.New("not found")
 
 // RobotName is the short name of the push robot of every project.
-const RobotName = "forgeai"
+const RobotName = "project"
 
 // Client calls the Harbor API with basic auth.
 type Client struct {
@@ -266,7 +266,7 @@ func (c *Client) EnsureRobot(ctx context.Context, p *Project, name, secret strin
 	if errors.Is(err, ErrNotFound) {
 		in := map[string]any{
 			"name": name, "level": "project", "duration": -1, "disable": false,
-			"description": "forgeai push/pull robot", "permissions": robotPermissions(p.Name),
+			"description": "project push/pull robot", "permissions": robotPermissions(p.Name),
 		}
 		var out struct {
 			ID   int64  `json:"id"`

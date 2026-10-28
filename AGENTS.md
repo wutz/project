@@ -1,8 +1,8 @@
 # project - AI Agent Guide
 
-This repository is a single-controller Kubebuilder project. It reconciles the
-`Project` CRD (`forgeai.wutz.dev/v1alpha1`) and the registry controller that
-gives each Project a Harbor project.
+This repository is a Kubebuilder project with three controllers. It reconciles the
+`Project` CRD and the `InstanceType` CRD (both in `project.wutz.dev/v1alpha1`), and the
+registry controller that gives each Project a Harbor project.
 
 ## Project Structure
 
@@ -10,15 +10,15 @@ Single-group layout (the only layout used here):
 
 ```
 cmd/main.go                    Manager entry (registers controllers)
-api/v1alpha1/*_types.go        Project CRD schema (+kubebuilder markers)
+api/v1alpha1/*_types.go        Project and InstanceType CRD schemas (+kubebuilder markers)
 api/v1alpha1/zz_generated.*    Auto-generated (DO NOT EDIT)
-internal/controller/*          Project and registry reconcilers
+internal/controller/*          Project, InstanceType and registry reconcilers
 internal/controller/testdata/  CRDs loaded by envtest (Kueue, InstanceType)
-pkg/platform/                  Platform ConfigMap loader (shared schema with the GUI)
+pkg/platform/                  Platform ConfigMap loader
 pkg/harbor/                    Harbor API client
 pkg/naming/                    Namespace and resource naming
 pkg/instancetype/              InstanceType reads (unstructured)
-pkg/kf/, pkg/sandbox/          Kueue and agent-sandbox type helpers
+pkg/kf/, pkg/sandbox/          Kueue, Kubeflow Trainer and agent-sandbox API groups
 config/crd/bases/*             Generated CRDs (DO NOT EDIT)
 config/rbac/role.yaml          Generated RBAC (DO NOT EDIT)
 config/samples/*               Example CRs (edit these)
@@ -40,12 +40,14 @@ PROJECT                        Kubebuilder metadata (generated)
 Do not delete `// +kubebuilder:scaffold:*` comments. The CLI injects code at these markers.
 
 ### Keep the Public Contract Stable
-- The API group `project.wutz.dev`, the field owner `forgeai`, and the finalizer
-  `forgeai.wutz.dev/project` are shared with existing objects created by the forgeai
-  platform. Do not rename them without a migration.
-- The platform ConfigMap `forgeai-platform` (key `config.yaml`) in the namespace set by
-  `FORGEAI_NAMESPACE` is read by `pkg/platform`. Its schema is shared with the forgeai GUI.
+- The API group `project.wutz.dev`, the field owner `project`, and the finalizers
+  `project.wutz.dev/*` are recorded on existing objects. Renaming any of them needs a migration.
+- The platform ConfigMap `project-platform` (key `config.yaml`) in the namespace set by
+  `PROJECT_NAMESPACE` is read by `pkg/platform`. Its schema is public too.
 - The chart values, README and CRD field names are public API. Changes need a release note.
+- Member roles (`project-edit`, `project-view`) aggregate the ClusterRoles labelled
+  `project.wutz.dev/aggregate-to-member`. A platform adds rules for its own kinds with its
+  own labelled ClusterRoles; do not add kinds the operator does not own.
 
 ### Use the CLI for Scaffolding
 Use `kubebuilder create api` and `kubebuilder create webhook` to scaffold. Do not create

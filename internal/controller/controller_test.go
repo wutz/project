@@ -54,7 +54,7 @@ func get(obj client.Object, ns, name string) func() error {
 
 var _ = Describe("project operator", Ordered, func() {
 	const project = "demo"
-	ns := "forge-" + project
+	ns := "project-" + project
 
 	BeforeAll(func() {
 		// Two GPUs of 8 cores and 64 GiB each per node leave 15 cores and 120 GiB per GPU.
@@ -112,7 +112,7 @@ var _ = Describe("project operator", Ordered, func() {
 		cq.SetGroupVersionKind(kf.ClusterQueueGVK)
 		Expect(get(cq, "", ns)()).To(Succeed())
 		flavors, _, _ := unstructured.NestedSlice(cq.Object, "spec", "resourceGroups")
-		Expect(fmt.Sprint(flavors)).To(ContainSubstring("forgeai-rtx-5090"))
+		Expect(fmt.Sprint(flavors)).To(ContainSubstring("project-rtx-5090"))
 		Expect(fmt.Sprint(flavors)).To(ContainSubstring(naming.ResourceFlavor("cpu")))
 		cpuFlavor := &unstructured.Unstructured{}
 		cpuFlavor.SetGroupVersionKind(kf.ResourceFlavorGVK)
@@ -123,12 +123,12 @@ var _ = Describe("project operator", Ordered, func() {
 
 		Expect(p.Status.Members).To(HaveLen(2))
 		sa := &corev1.ServiceAccount{}
-		Expect(get(sa, "forgeai-members", "demo.alice")()).To(Succeed())
+		Expect(get(sa, "project-members", "demo.alice")()).To(Succeed())
 		rb := &rbacv1.RoleBinding{}
-		Expect(get(rb, ns, "forgeai-member-bob")()).To(Succeed())
-		Expect(rb.RoleRef.Name).To(Equal("forgeai-project-view"))
+		Expect(get(rb, ns, "project-member-bob")()).To(Succeed())
+		Expect(rb.RoleRef.Name).To(Equal("project-view"))
 		crb := &rbacv1.ClusterRoleBinding{}
-		Expect(get(crb, "", "forgeai:project:demo")()).To(Succeed())
+		Expect(get(crb, "", "project:project:demo")()).To(Succeed())
 		Expect(crb.Subjects).To(HaveLen(2))
 
 		Expect(fakeHarbor.HasProject(ns)).To(BeTrue())
@@ -172,10 +172,10 @@ var _ = Describe("project operator", Ordered, func() {
 		p.Spec.Network.Isolation = v1.NetworkNone
 		Expect(k8sClient.Update(ctx, p)).To(Succeed())
 		Eventually(func() bool {
-			return apierrors.IsNotFound(get(&corev1.ServiceAccount{}, "forgeai-members", "demo.bob")())
+			return apierrors.IsNotFound(get(&corev1.ServiceAccount{}, "project-members", "demo.bob")())
 		}, timeout, interval).Should(BeTrue())
 		Eventually(func() bool {
-			return apierrors.IsNotFound(get(&rbacv1.RoleBinding{}, ns, "forgeai-member-bob")())
+			return apierrors.IsNotFound(get(&rbacv1.RoleBinding{}, ns, "project-member-bob")())
 		}, timeout, interval).Should(BeTrue())
 		Eventually(func() bool {
 			return apierrors.IsNotFound(get(&networkingv1.NetworkPolicy{}, ns, naming.NetworkPolicyName)())
@@ -201,7 +201,7 @@ var _ = Describe("project operator", Ordered, func() {
 	})
 
 	It("refuses to adopt a foreign namespace", func() {
-		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-taken"}})).To(Succeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "project-taken"}})).To(Succeed())
 		p := &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "taken"}}
 		Expect(k8sClient.Create(ctx, p)).To(Succeed())
 		Eventually(func() string {
@@ -220,9 +220,9 @@ var _ = Describe("project operator", Ordered, func() {
 		Expect(k8sClient.Update(ctx, p)).To(Succeed())
 		Eventually(func() string {
 			rb := &rbacv1.RoleBinding{}
-			_ = get(rb, ns, "forgeai-member-alice")()
+			_ = get(rb, ns, "project-member-alice")()
 			return rb.RoleRef.Name
-		}, timeout, interval).Should(Equal("forgeai-project-view"))
+		}, timeout, interval).Should(Equal("project-view"))
 	})
 
 	It("deletes the namespace and registry with deletionPolicy Delete", func() {
@@ -236,6 +236,6 @@ var _ = Describe("project operator", Ordered, func() {
 		nsObj := &corev1.Namespace{}
 		Expect(get(nsObj, "", ns)()).To(Succeed())
 		Expect(nsObj.DeletionTimestamp.IsZero()).To(BeFalse())
-		Expect(apierrors.IsNotFound(get(&rbacv1.ClusterRole{}, "", "forgeai:project:demo")())).To(BeTrue())
+		Expect(apierrors.IsNotFound(get(&rbacv1.ClusterRole{}, "", "project:project:demo")())).To(BeTrue())
 	})
 })

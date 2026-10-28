@@ -1,19 +1,18 @@
-// Package platform loads the forgeai platform config shared by the operator
-// and the GUI: namespace prefix, storage types, registry, instance type
-// sizing, default quotas and service settings.
+// Package platform loads the platform config the operator reads: namespace
+// prefix, registry, instance type sizing, default quotas and network settings.
+// The config is a ConfigMap written by the platform that runs the operator;
+// keys the operator does not use are ignored.
 package platform
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -21,20 +20,11 @@ import (
 
 const (
 	// ConfigMapName holds the platform config under key ConfigKey.
-	ConfigMapName = "forgeai-platform"
+	ConfigMapName = "project-platform"
 	ConfigKey     = "config.yaml"
 	// DefaultNamespace is where the operator and its config live.
-	DefaultNamespace = "forgeai-system"
+	DefaultNamespace = "project-system"
 )
-
-// StorageType maps a volume type to a StorageClass.
-type StorageType struct {
-	StorageClass string `json:"storageClass"`
-	// AccessMode defaults to ReadWriteMany.
-	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
-	// Description is shown in the GUI.
-	Description string `json:"description,omitempty"`
-}
 
 // Ingress is how user-facing services are exposed.
 type Ingress struct {
@@ -60,8 +50,7 @@ func (i Ingress) URL(sub string) string {
 // Host returns <sub>.<domain>.
 func (i Ingress) Host(sub string) string { return sub + "." + i.Domain }
 
-// Gateway publishes sandbox ports through a Gateway API Gateway. A sandbox with
-// a gateway port gets an HTTPRoute on <name>-<namespace>.<ingress domain>.
+// Gateway publishes services through a Gateway API Gateway.
 type Gateway struct {
 	// Name and Namespace of the Gateway the routes attach to. Its listeners
 	// must admit routes from the project namespaces.
@@ -70,7 +59,7 @@ type Gateway struct {
 	// SectionName is the listener the routes attach to; empty means any.
 	SectionName string `json:"sectionName,omitempty"`
 	// Scheme and Port are the listener as seen from outside, for the URLs
-	// shown in the GUI. Scheme defaults to https.
+	// shown to users. Scheme defaults to https.
 	Scheme string `json:"scheme,omitempty"`
 	Port   int    `json:"port,omitempty"`
 }
@@ -136,8 +125,8 @@ type Quota struct {
 	Storage resource.Quantity `json:"storage"`
 	Volumes int32             `json:"volumes,omitempty"`
 	Pods    int32             `json:"pods,omitempty"`
-	// Headroom is CPU and memory allowed outside GPU jobs (file server,
-	// helper pods), on top of the GPU-derived quota.
+	// Headroom is CPU and memory allowed outside GPU jobs (helper pods),
+	// on top of the GPU-derived quota.
 	Headroom struct {
 		CPU    resource.Quantity `json:"cpu"`
 		Memory resource.Quantity `json:"memory"`
@@ -159,135 +148,15 @@ type Network struct {
 	SystemNamespaces []string `json:"systemNamespaces,omitempty"`
 	// DNSNamespace runs the cluster DNS, allowed when denyInternet is set.
 	DNSNamespace string `json:"dnsNamespace,omitempty"`
+	// SandboxNamespace runs the agent-sandbox controller, which reaches the
+	// pods of a project and their sandboxes.
+	SandboxNamespace string `json:"sandboxNamespace,omitempty"`
 }
 
-// FileServer configures the on-demand file transfer service.
-type FileServer struct {
-	Image       string          `json:"image,omitempty"`
-	IdleTimeout metav1.Duration `json:"idleTimeout,omitzero"`
-	// HostPrefix builds the host files-<namespace>.<ingress domain>.
-	HostPrefix string `json:"hostPrefix,omitempty"`
-}
-
-// Training configures job rendering and failure handling.
-type Training struct {
-	// DefaultRuntime is the ClusterTrainingRuntime used by jobs without a template.
-	DefaultRuntime string `json:"defaultRuntime,omitempty"`
-	// ShmSize of the /dev/shm emptyDir.
-	ShmSize resource.Quantity `json:"shmSize"`
-	// StuckTimeout fails a job whose pods cannot start (image pull errors,
-	// crash loops) for this long.
-	StuckTimeout metav1.Duration `json:"stuckTimeout,omitzero"`
-	// MaxRetries is the default retry count of jobs that set none.
-	MaxRetries int32 `json:"maxRetries,omitempty"`
-}
-
-// Sandbox configures the agent sandboxes (agents.x-k8s.io Sandboxes): the
-// images offered, the isolation runtime classes and the idle policy.
-type Sandbox struct {
-	// DefaultImage runs a sandbox whose form names none.
-	DefaultImage string `json:"defaultImage,omitempty"`
-	// Images are the images offered in the GUI (others can be typed in).
-	Images []string `json:"images,omitempty"`
-	// RuntimeClasses are the isolation runtime classes offered (gvisor,
-	// kata); DefaultRuntimeClass is preselected. The RuntimeClass objects
-	// must be installed by the platform.
-	RuntimeClasses      []string `json:"runtimeClasses,omitempty"`
-	DefaultRuntimeClass string   `json:"defaultRuntimeClass,omitempty"`
-	// ShmSize is the /dev/shm emptyDir of a sandbox.
-	ShmSize resource.Quantity `json:"shmSize"`
-	// IdleTimeout suspends a running sandbox that nothing used for this
-	// long; 0 disables it.
-	IdleTimeout metav1.Duration `json:"idleTimeout,omitzero"`
-	// Namespace runs the agent-sandbox controller; project network policies
-	// let it reach the sandbox pods.
-	Namespace string `json:"namespace,omitempty"`
-	// SSHImage is the sshd sidecar of a sandbox that enables SSH. It must accept
-	// only the platform identity key and public-key logins.
-	SSHImage string `json:"sshImage,omitempty"`
-}
-
-// Default images of the SSH access. The sshd image is built from images/sshd.
-const (
-	DefaultSSHImage        = "ghcr.io/wutz/forgeai-sshd:0.1.0"
-	DefaultSSHGatewayImage = "ghcr.io/tg123/sshpiperd:v1.6.1"
-)
-
-// SSH configures the SSH gateways.
-type SSH struct {
-	// GatewayImage is the sshpiperd image that serves the SSH gateways.
-	GatewayImage string `json:"gatewayImage,omitempty"`
-}
-
-// Inference configures the model servers of InferenceServices and the llm-d
-// routers in front of them.
-type Inference struct {
-	// Image is the vLLM server image, used by services without an image.
-	Image string `json:"image,omitempty"`
-	// RouterImage is the llm-d router Endpoint Picker image, with its tag.
-	RouterImage string `json:"routerImage,omitempty"`
-	// ShmSize is the /dev/shm emptyDir of a model server: tensor parallel
-	// workers exchange data through shared memory.
-	ShmSize resource.Quantity `json:"shmSize"`
-	// HFEndpoint is the Hugging Face endpoint the model servers download
-	// weights from (HF_ENDPOINT). Clusters without access to huggingface.co set
-	// a mirror here, such as https://hf-mirror.com.
-	HFEndpoint string `json:"hfEndpoint,omitempty"`
-	// Cache keeps the weights of each InferenceService on a PersistentVolume-
-	// Claim, so that a restart loads them again instead of downloading them.
-	// Empty uses an emptyDir, and every start downloads the weights.
-	Cache InferenceCache `json:"cache,omitempty"`
-	// StartupTimeout is how long a model server may take to become healthy: a
-	// cold start downloads the weights (tens of GB, over a mirror at a few MB/s)
-	// before it loads them into the GPUs. The pod is killed when it expires.
-	StartupTimeout metav1.Duration `json:"startupTimeout,omitzero"`
-}
-
-// InferenceCache is the volume holding the downloaded weights of a model.
-type InferenceCache struct {
-	// StorageClass of the claim; the default StorageClass when empty.
-	StorageClass string `json:"storageClass,omitempty"`
-	// Size of the claim.
-	Size resource.Quantity `json:"size"`
-}
-
-// Enabled reports whether a cache was configured.
-func (c InferenceCache) Enabled() bool { return c.StorageClass != "" || !c.Size.IsZero() }
-
-// DefaultSandboxNamespace is where agent-sandbox is installed.
-const DefaultSandboxNamespace = "agent-sandbox-system"
-
-// Templates configures the public template source the GUI offers in the
-// create dialogs.
-type Templates struct {
-	// Source is an https:// URL, a file:// directory holding index.yaml, or an
-	// oci:// reference to a published source.
-	// Empty uses the forgeai default source (wutz/forgeai-templates on its main branch).
-	Source string `json:"source,omitempty"`
-}
-
-// NamespaceOrDefault is the agent-sandbox namespace.
-func (s Sandbox) NamespaceOrDefault() string {
-	if s.Namespace != "" {
-		return s.Namespace
-	}
-	return DefaultSandboxNamespace
-}
-
-// HasRuntimeClass reports whether a runtime class is offered (or none is
-// configured, in which case anything the cluster has is accepted).
-func (s Sandbox) HasRuntimeClass(name string) bool {
-	if len(s.RuntimeClasses) == 0 {
-		return true
-	}
-	return slices.Contains(s.RuntimeClasses, name)
-}
-
+// Config is the platform config the operator reads.
 type Config struct {
 	// NamespacePrefix is prepended to project names.
 	NamespacePrefix string `json:"namespacePrefix,omitempty"`
-	// APIServer is the URL written into member kubeconfigs.
-	APIServer string `json:"apiServer,omitempty"`
 	// MembersNamespace holds member ServiceAccounts and tokens, out of reach
 	// of project members.
 	MembersNamespace string `json:"membersNamespace,omitempty"`
@@ -296,47 +165,14 @@ type Config struct {
 	Gateway  Gateway  `json:"gateway,omitzero"`
 	Registry Registry `json:"registry"`
 
-	// StorageTypes maps a volume type (e.g. shared) to its StorageClass.
-	StorageTypes       map[string]StorageType `json:"storageTypes,omitempty"`
-	DefaultStorageType string                 `json:"defaultStorageType,omitempty"`
-
 	InstanceTypes InstanceTypes `json:"instanceTypes"`
 	DefaultQuota  Quota         `json:"defaultQuota"`
 	Network       Network       `json:"network"`
-	FileServer    FileServer    `json:"fileServer"`
-	Training      Training      `json:"training"`
-	Sandbox       Sandbox       `json:"sandbox"`
-	SSH           SSH           `json:"ssh,omitzero"`
-	Inference     Inference     `json:"inference"`
-	Templates     Templates     `json:"templates,omitzero"`
-
-	// TrashRetention is the default retention of deleted volumes.
-	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
-}
-
-// StorageType looks up a volume type; empty selects the default.
-func (c *Config) StorageType(name string) (string, StorageType, error) {
-	if name == "" {
-		name = c.DefaultStorageType
-	}
-	if t, ok := c.StorageTypes[name]; ok && t.StorageClass != "" {
-		if t.AccessMode == "" {
-			t.AccessMode = corev1.ReadWriteMany
-		}
-		return name, t, nil
-	}
-	return "", StorageType{}, fmt.Errorf("volume type %q is not supported", name)
 }
 
 func defaultQuantity(q *resource.Quantity, v string) {
 	if q.IsZero() {
 		*q = resource.MustParse(v)
-	}
-}
-
-func defaultDuration(d *metav1.Duration, v time.Duration) {
-	if d.Duration == 0 {
-		d.Duration = v
 	}
 }
 
@@ -347,10 +183,10 @@ func Parse(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("parse platform config: %w", err)
 	}
 	if c.NamespacePrefix == "" {
-		c.NamespacePrefix = "forge-"
+		c.NamespacePrefix = "project-"
 	}
 	if c.MembersNamespace == "" {
-		c.MembersNamespace = "forgeai-members"
+		c.MembersNamespace = "project-members"
 	}
 	if c.Ingress.Port == 0 {
 		c.Ingress.Port = 443
@@ -359,7 +195,7 @@ func Parse(data []byte) (*Config, error) {
 		c.Gateway.Scheme = "https"
 	}
 	if c.Registry.AdminSecret == "" {
-		c.Registry.AdminSecret = "forgeai-harbor"
+		c.Registry.AdminSecret = "project-registry-admin"
 	}
 	if len(c.InstanceTypes.Sizes) == 0 {
 		c.InstanceTypes.Sizes = []int32{1, 2, 4, 8}
@@ -381,52 +217,15 @@ func Parse(data []byte) (*Config, error) {
 	if c.Network.DNSNamespace == "" {
 		c.Network.DNSNamespace = "kube-system"
 	}
-	if c.FileServer.Image == "" {
-		c.FileServer.Image = "docker.io/sigoden/dufs:v0.46.0"
+	if c.Network.SandboxNamespace == "" {
+		c.Network.SandboxNamespace = "agent-sandbox-system"
 	}
-	if c.FileServer.HostPrefix == "" {
-		c.FileServer.HostPrefix = "files-"
-	}
-	defaultDuration(&c.FileServer.IdleTimeout, 30*time.Minute)
-	if c.Training.DefaultRuntime == "" {
-		c.Training.DefaultRuntime = "torch-distributed"
-	}
-	defaultQuantity(&c.Training.ShmSize, "16Gi")
-	defaultDuration(&c.Training.StuckTimeout, 15*time.Minute)
-	if c.Sandbox.Namespace == "" {
-		c.Sandbox.Namespace = DefaultSandboxNamespace
-	}
-	if c.Sandbox.DefaultImage == "" {
-		c.Sandbox.DefaultImage = "registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.1.0"
-	}
-	if c.Sandbox.DefaultRuntimeClass == "" && len(c.Sandbox.RuntimeClasses) > 0 {
-		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
-	}
-	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
-	if c.Sandbox.SSHImage == "" {
-		c.Sandbox.SSHImage = DefaultSSHImage
-	}
-	if c.SSH.GatewayImage == "" {
-		c.SSH.GatewayImage = DefaultSSHGatewayImage
-	}
-	if c.Inference.Image == "" {
-		c.Inference.Image = "vllm/vllm-openai:v0.32.0"
-	}
-	if c.Inference.RouterImage == "" {
-		c.Inference.RouterImage = "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0"
-	}
-	defaultQuantity(&c.Inference.ShmSize, "16Gi")
-	defaultDuration(&c.Inference.StartupTimeout, 2*time.Hour)
-	if c.Inference.Cache.Enabled() {
-		defaultQuantity(&c.Inference.Cache.Size, "200Gi")
-	}
-	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }
 
-// Namespace returns the platform namespace from FORGEAI_NAMESPACE or the default.
+// Namespace returns the platform namespace from PROJECT_NAMESPACE or the default.
 func Namespace() string {
-	if ns := os.Getenv("FORGEAI_NAMESPACE"); ns != "" {
+	if ns := os.Getenv("PROJECT_NAMESPACE"); ns != "" {
 		return ns
 	}
 	return DefaultNamespace

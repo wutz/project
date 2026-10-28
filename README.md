@@ -62,9 +62,10 @@ spec:
   operator keeps no queues or ResourceFlavors, and the ResourceQuota alone limits a project.
 - GPU nodes labelled with `nvidia.com/gpu.product`. The operator derives the `InstanceType`
   objects (`instancetypes.project.wutz.dev`) from them and uses them to size GPU quotas.
-- A platform config ConfigMap named `forgeai-platform` with key `config.yaml`, in the
-  namespace given by `FORGEAI_NAMESPACE` (default `forgeai-system`). It holds the
-  namespace prefix, storage types, registry, default quotas and ingress settings.
+- A platform config ConfigMap named `project-platform` with key `config.yaml`, in the
+  namespace the operator runs in (`PROJECT_NAMESPACE`, which the chart sets to the release
+  namespace). The platform that installs the operator creates it. It holds the namespace
+  prefix, registry, instance type sizing, default quotas, network and ingress settings.
   The operator reloads it when it changes.
 
 ## Install
@@ -74,10 +75,11 @@ The chart is published as an OCI artifact and the image to GHCR. Both are public
 ```bash
 helm install project oci://ghcr.io/wutz/charts/project \
   --version 0.5.0 \
-  --namespace forgeai-system
+  --namespace project-system
 ```
 
-Install it into the forgeai namespace, next to forgeai. The operator reads the platform ConfigMap from its own namespace, so it must run where forgeai's `forgeai-platform` ConfigMap lives (`FORGEAI_NAMESPACE`, default `forgeai-system`).
+The operator reads the platform ConfigMap from its own namespace, so the platform config
+must be created in the namespace the chart is installed into.
 
 Override values with `--set` or a values file. Common settings:
 

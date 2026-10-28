@@ -282,7 +282,7 @@ spec:
                       (dockerconfigjson).
                     type: string
                   url:
-                    description: url is the push prefix, e.g. cr.example.com:7443/forge-foo.
+                    description: url is the push prefix, e.g. cr.example.com:7443/project-foo.
                     type: string
                 type: object
             type: object

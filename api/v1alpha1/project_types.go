@@ -152,7 +152,7 @@ type MemberStatus struct {
 type RegistryStatus struct {
 	// project is the Harbor project name.
 	Project string `json:"project,omitempty"`
-	// url is the push prefix, e.g. cr.example.com:7443/forge-foo.
+	// url is the push prefix, e.g. cr.example.com:7443/project-foo.
 	URL string `json:"url,omitempty"`
 	// secret in the project namespace holds the robot account (dockerconfigjson).
 	Secret string `json:"secret,omitempty"`

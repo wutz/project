@@ -2,7 +2,6 @@ package platform
 
 import (
 	"testing"
-	"time"
 )
 
 func TestDefaults(t *testing.T) {
@@ -13,14 +12,14 @@ func TestDefaults(t *testing.T) {
 	if c.Ingress.URL("x") != "https://x." {
 		t.Errorf("port 443 must be omitted: %s", c.Ingress.URL("x"))
 	}
-	if c.DefaultQuota.GPUCount("any") != 8 || c.FileServer.IdleTimeout.Duration != 30*time.Minute {
+	if c.DefaultQuota.GPUCount("any") != 8 {
 		t.Errorf("defaults: %+v", c.DefaultQuota)
 	}
-	if c.InstanceTypes.Reserved.CPU.String() != "2" || c.TrashRetention.Duration != 7*24*time.Hour {
+	if c.InstanceTypes.Reserved.CPU.String() != "2" {
 		t.Errorf("defaults: %+v", c.InstanceTypes)
 	}
-	if _, _, err := c.StorageType("nope"); err == nil {
-		t.Error("expected unknown storage type error")
+	if c.Network.SandboxNamespace != "agent-sandbox-system" || c.Registry.AdminSecret != "project-registry-admin" {
+		t.Errorf("defaults: %+v", c.Network)
 	}
 }
 

@@ -22,7 +22,7 @@ func TestNames(t *testing.T) {
 	if got := InstanceTypeName("a", 16); got != "a.x16" {
 		t.Errorf("InstanceTypeName = %q", got)
 	}
-	if got := Namespace("forge-", "demo"); got != "forge-demo" {
+	if got := Namespace("project-", "demo"); got != "project-demo" {
 		t.Errorf("Namespace = %q", got)
 	}
 }

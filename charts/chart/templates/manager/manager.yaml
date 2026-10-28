@@ -8,10 +8,9 @@ metadata:
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     control-plane: controller-manager
-    # The forgeai GUI reads these labels: the dependency label marks an install from
-    # this chart, and the version label is the installed version (gui/app/deps.go).
-    forgeai.wutz.dev/dependency: project
-    forgeai.wutz.dev/dependency-version: {{ .Chart.AppVersion | quote }}
+    # Dependency labels let a platform find this install and the version it runs.
+    project.wutz.dev/dependency: project
+    project.wutz.dev/dependency-version: {{ .Chart.AppVersion | quote }}
     {{- with .Values.manager.labels }}
     {{- with omit . "app.kubernetes.io/managed-by" "app.kubernetes.io/name" "helm.sh/chart" "app.kubernetes.io/instance" "control-plane" }}
     {{- toYaml . | nindent 4 }}
@@ -95,7 +94,7 @@ spec:
         # built by ko (/ko-app/cmd); the Dockerfile image uses /manager.
         env:
         # The namespace the operator and its platform ConfigMap live in.
-        - name: FORGEAI_NAMESPACE
+        - name: PROJECT_NAMESPACE
           value: {{ .Release.Namespace }}
         image: "{{ .Values.manager.image.repository | default "controller" }}{{- if not (contains "@" (.Values.manager.image.repository | default "controller")) }}:{{ .Values.manager.image.tag | default .Chart.AppVersion }}{{- end }}"
         {{- with .Values.manager.image.pullPolicy }}

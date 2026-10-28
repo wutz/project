@@ -45,17 +45,13 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const configNamespace = "forgeai-system"
+const configNamespace = "project-system"
 
 const testPlatformConfig = `
-namespacePrefix: forge-
-apiServer: https://api.example.com:6443
+namespacePrefix: project-
 ingress: {className: nginx, domain: example.com, port: 7443}
-gateway: {name: forgeai-sandbox, namespace: forgeai-system, scheme: http, port: 8080}
+gateway: {name: project-gateway, namespace: project-system, scheme: http, port: 8080}
 registry: {domain: cr.example.com:7443, adminSecret: harbor-admin}
-storageTypes:
-  shared: {storageClass: shared}
-defaultStorageType: shared
 instanceTypes:
   reserved: {cpu: "8", memory: 64Gi}
   sizes: [1, 2, 4, 8]
@@ -64,11 +60,6 @@ defaultQuota:
   storage: 1Ti
 network:
   systemNamespaces: [ingress-nginx]
-sandbox:
-  idleTimeout: 1h
-training:
-  stuckTimeout: 1s
-trashRetention: 1h
 `
 
 var (

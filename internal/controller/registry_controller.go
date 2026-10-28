@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	registryFinalizer = "forgeai.wutz.dev/registry"
+	registryFinalizer = "project.wutz.dev/registry"
 	kindSecret        = "Secret"
 	// Keys of the registry Secret besides .dockerconfigjson.
 	RegistryKeyUsername = "username"
