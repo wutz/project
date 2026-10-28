@@ -54,7 +54,7 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - instancetypes
   - projects
@@ -67,7 +67,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - instancetypes/status
   - projects/status
@@ -76,7 +76,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - projects/finalizers
   verbs:

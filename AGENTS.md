@@ -1,7 +1,7 @@
 # project - AI Agent Guide
 
 This repository is a Kubebuilder project with three controllers. It reconciles the
-`Project` CRD and the `InstanceType` CRD (both in `project.wutz.dev/v1alpha1`), and the
+`Project` CRD and the `InstanceType` CRD (both in `workspace.wutz.dev/v1alpha1`), and the
 registry controller that gives each Project a Harbor project.
 
 ## Project Structure
@@ -40,13 +40,13 @@ PROJECT                        Kubebuilder metadata (generated)
 Do not delete `// +kubebuilder:scaffold:*` comments. The CLI injects code at these markers.
 
 ### Keep the Public Contract Stable
-- The API group `project.wutz.dev`, the field owner `project`, and the finalizers
-  `project.wutz.dev/*` are recorded on existing objects. Renaming any of them needs a migration.
-- The platform ConfigMap `project-platform` (key `config.yaml`) in the namespace set by
+- The API group `workspace.wutz.dev`, the field owner `project`, and the finalizers
+  `workspace.wutz.dev/*` are recorded on existing objects. Renaming any of them needs a migration.
+- The platform ConfigMap `workspace-platform` (key `config.yaml`) in the namespace set by
   `PROJECT_NAMESPACE` is read by `pkg/platform`. Its schema is public too.
 - The chart values, README and CRD field names are public API. Changes need a release note.
-- Member roles (`project-edit`, `project-view`) aggregate the ClusterRoles labelled
-  `project.wutz.dev/aggregate-to-member`. A platform adds rules for its own kinds with its
+- Member roles (`workspace-edit`, `workspace-view`) aggregate the ClusterRoles labelled
+  `workspace.wutz.dev/aggregate-to-member`. A platform adds rules for its own kinds with its
   own labelled ClusterRoles; do not add kinds the operator does not own.
 
 ### Use the CLI for Scaffolding
@@ -117,7 +117,7 @@ Reference: https://github.com/kubernetes/community/blob/master/contributors/deve
 
 ## Distribution
 
-- Container image: `ghcr.io/wutz/project`, built by the release workflow on tags.
+- Container image: `ghcr.io/wutz/workspace`, built by the release workflow on tags.
 - Helm chart: `oci://ghcr.io/wutz/charts/project`, versioned from `charts/chart/Chart.yaml`.
 - Keep `charts/chart/Chart.yaml` `version` and `appVersion` in step with the release tag.
 

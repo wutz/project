@@ -7,9 +7,9 @@ metadata:
     "helm.sh/resource-policy": keep
     {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: instancetypes.project.wutz.dev
+  name: instancetypes.workspace.wutz.dev
 spec:
-  group: project.wutz.dev
+  group: workspace.wutz.dev
   names:
     categories:
     - project

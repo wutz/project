@@ -1,20 +1,20 @@
 # Member role bound in the project namespace (read only). It aggregates every
-# ClusterRole labelled project.wutz.dev/aggregate-to-member=view.
+# ClusterRole labelled workspace.wutz.dev/aggregate-to-member=view.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: project-view
+  name: workspace-view
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
-      project.wutz.dev/aggregate-to-member: view
+      workspace.wutz.dev/aggregate-to-member: view
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: project-member-view
   labels:
-    project.wutz.dev/aggregate-to-member: view
+    workspace.wutz.dev/aggregate-to-member: view
 rules:
 - apiGroups:
   - ""
@@ -34,7 +34,7 @@ rules:
   resources:
   - configmaps
   resourceNames:
-  - project-platform
+  - workspace-platform
   verbs:
   - get
 - apiGroups:

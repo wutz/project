@@ -19,7 +19,7 @@ import (
 )
 
 // GVK of the InstanceType.
-var GVK = schema.GroupVersionKind{Group: "project.wutz.dev", Version: "v1alpha1", Kind: "InstanceType"}
+var GVK = schema.GroupVersionKind{Group: "workspace.wutz.dev", Version: "v1alpha1", Kind: "InstanceType"}
 
 // ResourceGPU is the NVIDIA device plugin resource.
 const ResourceGPU corev1.ResourceName = "nvidia.com/gpu"

@@ -126,7 +126,7 @@ var _ = Describe("project operator", Ordered, func() {
 		Expect(get(sa, "project-members", "demo.alice")()).To(Succeed())
 		rb := &rbacv1.RoleBinding{}
 		Expect(get(rb, ns, "project-member-bob")()).To(Succeed())
-		Expect(rb.RoleRef.Name).To(Equal("project-view"))
+		Expect(rb.RoleRef.Name).To(Equal("workspace-view"))
 		crb := &rbacv1.ClusterRoleBinding{}
 		Expect(get(crb, "", "project:project:demo")()).To(Succeed())
 		Expect(crb.Subjects).To(HaveLen(2))
@@ -222,7 +222,7 @@ var _ = Describe("project operator", Ordered, func() {
 			rb := &rbacv1.RoleBinding{}
 			_ = get(rb, ns, "project-member-alice")()
 			return rb.RoleRef.Name
-		}, timeout, interval).Should(Equal("project-view"))
+		}, timeout, interval).Should(Equal("workspace-view"))
 	})
 
 	It("deletes the namespace and registry with deletionPolicy Delete", func() {

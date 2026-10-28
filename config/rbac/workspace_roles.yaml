@@ -3,8 +3,8 @@
 # operator also creates project:project:<name>, granting members read access
 # to their Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes.
 #
-# project-edit and project-view aggregate every ClusterRole labelled
-# project.wutz.dev/aggregate-to-member=<role>. The rules here cover the
+# workspace-edit and workspace-view aggregate every ClusterRole labelled
+# workspace.wutz.dev/aggregate-to-member=<role>. The rules here cover the
 # third-party APIs the platform workloads use; a platform adds the rules for its
 # own kinds with its own labelled ClusterRoles.
 #
@@ -12,18 +12,18 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: project-edit
+  name: workspace-edit
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
-      project.wutz.dev/aggregate-to-member: edit
+      workspace.wutz.dev/aggregate-to-member: edit
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: project-member-edit
   labels:
-    project.wutz.dev/aggregate-to-member: edit
+    workspace.wutz.dev/aggregate-to-member: edit
 rules:
 - apiGroups: [""]
   resources: [persistentvolumeclaims]
@@ -71,18 +71,18 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: project-view
+  name: workspace-view
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
-      project.wutz.dev/aggregate-to-member: view
+      workspace.wutz.dev/aggregate-to-member: view
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: project-member-view
   labels:
-    project.wutz.dev/aggregate-to-member: view
+    workspace.wutz.dev/aggregate-to-member: view
 rules:
 - apiGroups: [""]
   resources: [persistentvolumeclaims, pods, pods/log, events, resourcequotas, limitranges]
@@ -90,7 +90,7 @@ rules:
 # The copy of the platform config the GUI reads; the operator writes it into each project.
 - apiGroups: [""]
   resources: [configmaps]
-  resourceNames: [project-platform]
+  resourceNames: [workspace-platform]
   verbs: [get]
 - apiGroups: [events.k8s.io]
   resources: [events]

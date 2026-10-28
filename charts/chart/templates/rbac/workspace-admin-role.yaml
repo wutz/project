@@ -14,18 +14,16 @@ metadata:
     app.kubernetes.io/name: {{ include "project.name" . }}
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  name: {{ include "project.resourceName" (dict "suffix" "project-viewer-role" "context" $) }}
+  name: {{ include "project.resourceName" (dict "suffix" "workspace-admin-role" "context" $) }}
 rules:
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - projects
   verbs:
-  - get
-  - list
-  - watch
+  - '*'
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - projects/status
   verbs:

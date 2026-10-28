@@ -9,8 +9,8 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     control-plane: controller-manager
     # Dependency labels let a platform find this install and the version it runs.
-    project.wutz.dev/dependency: project
-    project.wutz.dev/dependency-version: {{ .Chart.AppVersion | quote }}
+    workspace.wutz.dev/dependency: project
+    workspace.wutz.dev/dependency-version: {{ .Chart.AppVersion | quote }}
     {{- with .Values.manager.labels }}
     {{- with omit . "app.kubernetes.io/managed-by" "app.kubernetes.io/name" "helm.sh/chart" "app.kubernetes.io/instance" "control-plane" }}
     {{- toYaml . | nindent 4 }}
