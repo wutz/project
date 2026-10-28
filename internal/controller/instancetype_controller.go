@@ -60,8 +60,8 @@ type InstanceTypeReconciler struct {
 	Now func() time.Time
 }
 
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=instancetypes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete

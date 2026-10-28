@@ -74,34 +74,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - project.wutz.dev
-  resources:
-  - instancetypes
-  - projects
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - project.wutz.dev
-  resources:
-  - instancetypes/status
-  - projects/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - project.wutz.dev
-  resources:
-  - projects/finalizers
-  verbs:
-  - update
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
@@ -118,3 +90,31 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - workspace.wutz.dev
+  resources:
+  - instancetypes
+  - projects
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workspace.wutz.dev
+  resources:
+  - instancetypes/status
+  - projects/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - workspace.wutz.dev
+  resources:
+  - projects/finalizers
+  verbs:
+  - update

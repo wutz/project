@@ -1,4 +1,4 @@
-apiVersion: project.wutz.dev/v1alpha1
+apiVersion: workspace.wutz.dev/v1alpha1
 kind: Project
 metadata:
   name: demo

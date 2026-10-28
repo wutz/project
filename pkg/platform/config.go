@@ -20,7 +20,7 @@ import (
 
 const (
 	// ConfigMapName holds the platform config under key ConfigKey.
-	ConfigMapName = "project-platform"
+	ConfigMapName = "workspace-platform"
 	ConfigKey     = "config.yaml"
 	// DefaultNamespace is where the operator and its config live.
 	DefaultNamespace = "project-system"

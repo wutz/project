@@ -11,14 +11,14 @@ import (
 const (
 	LabelManagedBy = "app.kubernetes.io/managed-by"
 	// ManagedBy is the LabelManagedBy value of every object the operator creates.
-	ManagedBy = "project"
+	ManagedBy = "workspace"
 	// LabelProject is set on project namespaces and every object the operator
 	// creates for a project (value = Project name).
-	LabelProject = "project.wutz.dev/project"
+	LabelProject = "workspace.wutz.dev/project"
 	// LabelMember is set on member ServiceAccounts and token Secrets.
-	LabelMember = "project.wutz.dev/member"
+	LabelMember = "workspace.wutz.dev/member"
 	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
-	LabelGPUClass = "project.wutz.dev/gpu-class"
+	LabelGPUClass = "workspace.wutz.dev/gpu-class"
 	// Node labels from NVIDIA GPU feature discovery.
 	LabelGPUProduct = "nvidia.com/gpu.product"
 	LabelGPUMemory  = "nvidia.com/gpu.memory"
@@ -27,15 +27,15 @@ const (
 // Fixed names inside a project namespace.
 const (
 	LocalQueueName     = "default"
-	RegistrySecretName = "project-registry"
-	NetworkPolicyName  = "project-isolation"
-	ResourceQuotaName  = "project-quota"
-	LimitRangeName     = "project-defaults"
+	RegistrySecretName = "workspace-registry"
+	NetworkPolicyName  = "workspace-isolation"
+	ResourceQuotaName  = "workspace-quota"
+	LimitRangeName     = "workspace-defaults"
 )
 
 // ClusterRolePrefix + role (edit, view) is bound per member in the project
-// namespace (see config/rbac/project_roles.yaml).
-const ClusterRolePrefix = "project-"
+// namespace (see config/rbac/workspace_roles.yaml).
+const ClusterRolePrefix = "workspace-"
 
 // Namespace is the namespace of a project.
 func Namespace(prefix, project string) string { return prefix + project }

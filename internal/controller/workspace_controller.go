@@ -54,7 +54,7 @@ import (
 
 const (
 	fieldOwner       = client.FieldOwner("project")
-	projectFinalizer = "project.wutz.dev/project"
+	projectFinalizer = "workspace.wutz.dev/project"
 	kindClusterRole  = "ClusterRole"
 	keyNominalQuota  = "nominalQuota"
 	verbGet          = "get"
@@ -75,16 +75,16 @@ type ProjectReconciler struct {
 	Kueue bool
 }
 
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/finalizers,verbs=update
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=projects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=projects/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts;secrets;resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=clusterqueues;localqueues,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // The member roles bound by the operator (it may only grant what it holds):
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=selfsubjectaccessreviews;selfsubjectrulesreviews,verbs=create
 

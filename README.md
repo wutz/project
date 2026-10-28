@@ -5,7 +5,7 @@ workspace: a namespace with a GPU/CPU/memory quota, a Kueue queue, storage and
 pod limits, a network policy, and per-member access.
 
 The operator runs three controllers. The Project controller reconciles the
-`Project` API (`project.wutz.dev/v1alpha1`). The InstanceType controller derives one
+`Project` API (`workspace.wutz.dev/v1alpha1`). The InstanceType controller derives one
 `InstanceType` per GPU class and size from the GPU nodes and keeps its availability up to
 date. The registry controller gives each Project a Harbor project when the platform config
 enables a registry.
@@ -30,7 +30,7 @@ project are removed (`Delete`) or only access is revoked (`Retain`, the default)
 A minimal example, from [config/samples/project_v1alpha1_project.yaml](config/samples/project_v1alpha1_project.yaml):
 
 ```yaml
-apiVersion: project.wutz.dev/v1alpha1
+apiVersion: workspace.wutz.dev/v1alpha1
 kind: Project
 metadata:
   name: demo
@@ -61,8 +61,8 @@ spec:
 - [Kueue](https://kueue.sigs.k8s.io/) with the `kueue.x-k8s.io/v1beta2` API. Optional: without it the
   operator keeps no queues or ResourceFlavors, and the ResourceQuota alone limits a project.
 - GPU nodes labelled with `nvidia.com/gpu.product`. The operator derives the `InstanceType`
-  objects (`instancetypes.project.wutz.dev`) from them and uses them to size GPU quotas.
-- A platform config ConfigMap named `project-platform` with key `config.yaml`, in the
+  objects (`instancetypes.workspace.wutz.dev`) from them and uses them to size GPU quotas.
+- A platform config ConfigMap named `workspace-platform` with key `config.yaml`, in the
   namespace the operator runs in (`PROJECT_NAMESPACE`, which the chart sets to the release
   namespace). The platform that installs the operator creates it. It holds the namespace
   prefix, registry, instance type sizing, default quotas, network and ingress settings.
@@ -85,7 +85,7 @@ Override values with `--set` or a values file. Common settings:
 
 | Key | Default | Description |
 |---|---|---|
-| `manager.image.repository` | `ghcr.io/wutz/project` | Controller image |
+| `manager.image.repository` | `ghcr.io/wutz/workspace` | Controller image |
 | `manager.image.tag` | `Chart.appVersion` | Controller image tag |
 | `manager.replicas` | `1` | Controller replicas (leader election is enabled) |
 | `metrics.enabled` | `true` | Serve Prometheus metrics |
@@ -120,7 +120,7 @@ make test-e2e
 ## Releases
 
 Pushing a `v*` tag runs `.github/workflows/helm-release.yml`. It publishes the
-container image to `ghcr.io/wutz/project` and the chart to
+container image to `ghcr.io/wutz/workspace` and the chart to
 `oci://ghcr.io/wutz/charts/project`, both tagged with the release version.
 
 ## License

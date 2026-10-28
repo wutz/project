@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	registryFinalizer = "project.wutz.dev/registry"
+	registryFinalizer = "workspace.wutz.dev/registry"
 	kindSecret        = "Secret"
 	// Keys of the registry Secret besides .dockerconfigjson.
 	RegistryKeyUsername = "username"
@@ -65,8 +65,8 @@ type RegistryReconciler struct {
 	NewHarbor       HarborFactory
 }
 
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=projects,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=projects/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 func (r *RegistryReconciler) harbor(ctx context.Context, cfg *platform.Config) (*harbor.Client, error) {

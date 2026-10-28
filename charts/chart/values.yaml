@@ -17,7 +17,7 @@ manager:
 
   image:
     # Published by .github/workflows/helm-release.yml for every release tag.
-    repository: ghcr.io/wutz/project
+    repository: ghcr.io/wutz/workspace
     ## Image tag (defaults to Chart.appVersion if not set)
     ##
     # tag: ""

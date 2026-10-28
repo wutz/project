@@ -1,0 +1,299 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.22.0
+  name: projects.workspace.wutz.dev
+spec:
+  group: workspace.wutz.dev
+  names:
+    categories:
+    - project
+    kind: Project
+    listKind: ProjectList
+    plural: projects
+    shortNames:
+    - fws
+    singular: project
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.namespace
+      name: Namespace
+      type: string
+    - jsonPath: .spec.network.isolation
+      name: Isolation
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="RegistryReady")].status
+      name: Registry
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          Project is a tenant: a labelled namespace with quota, network isolation,
+          a Kueue queue, a Harbor project and member credentials.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of Project
+            properties:
+              deletionPolicy:
+                default: Retain
+                description: deletionPolicy defaults to Retain.
+                enum:
+                - Retain
+                - Delete
+                type: string
+              displayName:
+                description: displayName is shown in the GUI.
+                type: string
+              members:
+                items:
+                  description: |-
+                    Member is a user of the project. Each member gets a ServiceAccount in the
+                    platform members namespace and a token that the admin exports as a kubeconfig.
+                  properties:
+                    name:
+                      description: name identifies the member within the project.
+                      maxLength: 40
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                    role:
+                      default: edit
+                      description: |-
+                        MemberRole is the access level of a project member. Members are managed by
+                        platform admins through the Project, so there is no project admin role.
+                      enum:
+                      - edit
+                      - view
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              network:
+                description: ProjectNetwork configures network isolation.
+                properties:
+                  denyInternet:
+                    description: denyInternet blocks egress outside the project (DNS
+                      stays allowed).
+                    type: boolean
+                  isolation:
+                    default: Isolated
+                    description: isolation defaults to Isolated.
+                    enum:
+                    - Isolated
+                    - None
+                    type: string
+                type: object
+              quota:
+                description: |-
+                  ProjectQuota limits what a project may run and store. Unset fields take the
+                  platform defaults.
+                properties:
+                  gpus:
+                    description: |-
+                      gpus is the GPU quota per GPU class. CPU and memory quotas follow from the
+                      per-GPU slice of each class. Jobs over quota wait in the queue.
+                    items:
+                      description: GPUQuota is the number of GPUs of one class a project
+                        may run at once.
+                      properties:
+                        class:
+                          description: class is the InstanceType GPU class, e.g. rtx-5090.
+                          minLength: 1
+                          type: string
+                        count:
+                          format: int32
+                          minimum: 0
+                          type: integer
+                      required:
+                      - class
+                      - count
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - class
+                    x-kubernetes-list-type: map
+                  pods:
+                    description: pods is the maximum number of pods.
+                    format: int32
+                    type: integer
+                  registryStorage:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: registryStorage is the Harbor project storage quota;
+                      empty is unlimited.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storage:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: storage is the total requested size of all volumes.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  volumes:
+                    description: volumes is the maximum number of volumes (PVCs).
+                    format: int32
+                    type: integer
+                type: object
+              trashRetention:
+                description: |-
+                  trashRetention is how long deleted volumes are kept before they are
+                  purged, unless a volume sets its own expiry. Defaults to the platform setting.
+                type: string
+            type: object
+          status:
+            description: status defines the observed state of Project
+            properties:
+              clusterQueue:
+                description: clusterQueue is the Kueue ClusterQueue enforcing the
+                  GPU quota.
+                type: string
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              localQueue:
+                description: localQueue is the queue jobs in the namespace submit
+                  to.
+                type: string
+              members:
+                items:
+                  description: MemberStatus reports the credentials of a member.
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      description: namespace of the ServiceAccount (the platform members
+                        namespace).
+                      type: string
+                    serviceAccount:
+                      description: serviceAccount of the member.
+                      type: string
+                    tokenSecret:
+                      description: tokenSecret holds the long-lived token (kubernetes.io/service-account-token).
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  - serviceAccount
+                  - tokenSecret
+                  type: object
+                type: array
+              namespace:
+                description: namespace backing the project.
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              registry:
+                description: RegistryStatus reports the Harbor project of a project.
+                properties:
+                  project:
+                    description: project is the Harbor project name.
+                    type: string
+                  secret:
+                    description: secret in the project namespace holds the robot account
+                      (dockerconfigjson).
+                    type: string
+                  url:
+                    description: url is the push prefix, e.g. cr.example.com:7443/project-foo.
+                    type: string
+                type: object
+            type: object
+        required:
+        - spec
+        type: object
+        x-kubernetes-validations:
+        - message: project name must be a DNS label of at most 40 characters
+          rule: self.metadata.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') && size(self.metadata.name)
+            <= 40
+    served: true
+    storage: true
+    subresources:
+      status: {}
